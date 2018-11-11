@@ -1,0 +1,49 @@
+struct mrl_nominee_item{
+    int region_id;
+    int group_id;
+    int addr_type;
+    char src_ip[MRL_STR_IP_LEN];
+    char mask_src_ip[MRL_STR_IP_LEN];
+    char dport[MRL_STR_PORT_LEN];
+    char mask_dport[MRL_STR_PORT_LEN];
+    int protocol;
+    int direction;
+    int is_vaild;
+    int action;
+    int service;
+    char date[DATE_LEN];
+    int type;
+    int strategy_group_id;
+};
+
+struct mrl_vxlan_info{
+    char vxlan_outer_local_mac[MRL_STR_MAC_LEN];//接收到的数据包的本地设备MAC地址
+    char vxlan_outer_gdev_mac[MRL_STR_MAC_LEN];//接收到的数据包的串行设备MAC地址
+    char vxlan_outer_local_ip[MRL_STR_IP_LEN];
+    char vxlan_outer_gdev_ip[MRL_STR_IP_LEN];//串行设备IP
+    char vxlan_outer_gdev_port[MRL_STR_PORT_LEN];
+    char vxlan_outer_local_port[MRL_STR_PORT_LEN];
+    unsigned char vxlan_encap_type;
+    int vxlan_link_id;
+    unsigned char vxlan_link_dir;
+    char vxlan_inner_smac[MRL_STR_MAC_LEN];
+    char vxlan_inner_dmac[MRL_STR_MAC_LEN];
+};
+struct mrl_candidate_item{
+    int candidate_id;
+    int addr_type;
+    char client_ip[MRL_STR_IP_LEN];//客户端IP
+    int type;
+    int location;
+    int group_id;
+    char mrl_ip[MRL_STR_IP_LEN];
+    struct mrl_vxlan_info vxlan_info;
+};
+
+MESA_htable_handle mrl_htable_init();
+Maat_feather_t mrl_Maat_feather_init(const char * instance_name,const char *table_name, Maat_start_callback_t *start,Maat_update_callback_t *update,Maat_finish_callback_t *finish,void *u_para);
+void nominee_update_cb(int table_id,const char* table_line,void* u_para);
+void candidate_update_cb(int table_id,const char* table_line,void* u_para);
+
+
+
