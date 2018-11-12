@@ -18,7 +18,7 @@ LIBS += -lMESA_prof_load -lMESA_handle_logger -lpthread -lmaatframe -lMESA_htabl
 
 TARGET = mrl
 
-OBJS = mrl_main.o mrl_base.o
+OBJS = mrl_main.o mrl_base.o mrl_packet.o mrl_redis.o
 
 .PHONY: all clean install
 

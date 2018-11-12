@@ -3,103 +3,22 @@
 #include <pthread.h>
 #include <string.h>
 #include <assert.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
 
-#include "stream_inc/stream_rawpkt.h"
-#include "MESA_prof_load.h"
-#include "MESA_handle_logger.h"
-#include "MESA_htable.h"
-#include "Maat_rule.h"
-#include "Maat_command.h"
-
+#include "mrl_main.h"
 #include "mrl_base.h"
 #include "mrl_redis.h"
-#include "mrl_socket.h"
+#include "mrl_packet.h"
 
-#define MRL_MAC_LEN 6
-#define MRL_BUFF_LEN 3000
-#define MRL_MAX_PATH 50
 #define MRL_MAX_STRING 50
 
-#define MRL_STR_MAC_LEN 18
-#define MRL_STR_PORT_LEN 6
-#define MRL_STR_IP_LEN 16
 #define MRL_STR_ENCAP_TYPE_LEN 5
 #define MRL_STR_LINK_ID_LEN 5
 #define MRL_STR_LINK_DIR_LEN 2
-
-
-#define MRL_IPV4_TYPE 4
-
-#define DATE_LEN 50
 
 #define RLOG_LV_DEBUG       10
 #define RLOG_LV_INFO        20
 #define RLOG_LV_FATAL       30
 #define CMD_LINE_NUM    1
-
-
-#define PORT_MODE (1<<10) -1
-#define PORT_MASK ((1<<15) -1)^((1<<6) -1)
-
-struct mrl_global_cfg
-{
-    //log info
-    char mrl_log_path[MRL_MAX_PATH];
-    int mrl_log_level;
-
-    //socket info
-    char mgw_ip[MRL_STR_IP_LEN];
-    unsigned short mgw_port;//mgw listen udp port
-    unsigned short mrl_port;//mrl listen udp port
-
-    //maat info
-    char Maat_table_path[MRL_MAX_PATH];
-    char Maat_redis_ip[MRL_STR_IP_LEN];    
-    unsigned short Maat_redis_port;    
-    char Maat_stat_path[MRL_MAX_PATH];
-    unsigned int Maat_max_threads;
-
-    //htable info
-    unsigned int ht_slots;
-    unsigned int ht_max_element_num;
-    int ht_mutex_num;
-    
-    /*vxlan info*/
-    unsigned int vxlan_gdev_num;
-    char **vxlan_outer_gdev_mac;
-    char vxlan_outer_local_mac[MRL_STR_MAC_LEN];
-    char **vxlan_outer_gdev_ip;
-    char vxlan_outer_local_ip[MRL_STR_IP_LEN];
-    char **vxlan_outer_gdev_port;
-    char xvlan_outer_local_port[MRL_STR_PORT_LEN];
-    char **vxlan_encap_type;
-    char **vxlan_link_id;
-    char **vxlan_link_dir;
-    char **vxlan_inner_smac;
-    char **vxlan_inner_dmac;
-    
-    char vxlan_inner_dip[MRL_STR_IP_LEN];
-    char vxlan_inner_dport[MRL_STR_PORT_LEN];
-    char vxlan_inner_sport[MRL_STR_PORT_LEN];
-};
-
-struct mrl_global_instance
-{
-    void *mrl_log_handle;
-    struct mrl_global_cfg mrl_cfg;
-
-    Maat_feather_t nominee_feather;
-    Maat_feather_t candidate_feather;
-
-    MESA_htable_handle ht_nominee;
-    MESA_htable_handle ht_candidate;
-
-    int *mrl_snd_fd;
-    int mrl_rcv_fd;
-    struct sockaddr_in mgw_addr;
-};
 
 struct mrl_global_instance mrl_instance;
 
@@ -261,8 +180,8 @@ extern "C" int mrl_init(void)
     }
     return 1;
 
-    mrl_instance.ht_nominee = mrl_htable_init();
-    mrl_instance.ht_candidate = mrl_htable_init();
+    mrl_instance.ht_nominee = mrl_htable_init((void *)ht_nominee_free_cb);
+    mrl_instance.ht_candidate = mrl_htable_init((void *)ht_candidate_free_cb);
 
     
     mrl_instance.nominee_feather = mrl_Maat_feather_init("mrl_nominee",IR_NOMINEE_IP_TABLE_NAME,NULL,nominee_update_cb,NULL,NULL);
@@ -285,6 +204,28 @@ extern "C" int mrl_init(void)
 int main()
 {
     mrl_init();
+    int index = 0;
+    struct mrl_candidate_item candidate_item;
+    char src_ip[]="192.168.11.23";
+    candidate_item.addr_type = 4 ;
+    memcpy(candidate_item.client_ip,src_ip,strlen(src_ip));
+    candidate_item.type = 0;
+         //to do how to get ip location
+    candidate_item.location = 0;
+    candidate_item.group_id = 1;
+    memcpy(candidate_item.mrl_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
+    memcpy(candidate_item.vxlan_info.vxlan_inner_smac, mrl_instance.mrl_cfg.vxlan_inner_smac[index],strlen(mrl_instance.mrl_cfg.vxlan_inner_smac[index]));
+    memcpy(candidate_item.vxlan_info.vxlan_inner_dmac, mrl_instance.mrl_cfg.vxlan_inner_dmac[index], strlen(mrl_instance.mrl_cfg.vxlan_inner_dmac[index]));
+    candidate_item.vxlan_info.vxlan_encap_type = atoi(mrl_instance.mrl_cfg.vxlan_encap_type[index]);
+    candidate_item.vxlan_info.vxlan_link_id = atoi(mrl_instance.mrl_cfg.vxlan_link_id[index]);
+    candidate_item.vxlan_info.vxlan_link_dir = atoi(mrl_instance.mrl_cfg.vxlan_link_dir[index]);
+    memcpy(candidate_item.vxlan_info.vxlan_outer_local_port, mrl_instance.mrl_cfg.xvlan_outer_local_port,strlen(mrl_instance.mrl_cfg.xvlan_outer_local_port));
+    memcpy(candidate_item.vxlan_info.vxlan_outer_gdev_port , mrl_instance.mrl_cfg.vxlan_outer_gdev_port[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[index]));
+    memcpy(candidate_item.vxlan_info.vxlan_outer_local_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
+    memcpy(candidate_item.vxlan_info.vxlan_outer_gdev_ip,  mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index]));
+    memcpy(candidate_item.vxlan_info.vxlan_outer_local_mac, mrl_instance.mrl_cfg.vxlan_outer_local_mac,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_mac));
+    memcpy(candidate_item.vxlan_info.vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[index]));
+    Maat_set_cmd_line(mrl_instance.candidate_feather, &candidate_item);
     return 1;
 }
 
@@ -294,6 +235,7 @@ extern "C" void mrl_destroy(void)
     MESA_destroy_runtime_log_handle(instance.logger);
     Maat_burn_feather(instance.maat_father);
     free(mrl_instance.mrl_cfg);
+    mrl_socket_close();
 }
 
 extern "C" char mrl_tcpall_entry(struct streaminfo *a_tcp,void **pme, int thread_seq, void *raw_packet)
