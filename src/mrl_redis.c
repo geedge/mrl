@@ -245,9 +245,10 @@ void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candid
 {
     const struct Maat_line_t *p_line;
 	struct Maat_line_t line_rule;
-	char table_line[128];
+	char table_line[512];
 	int ret=0;
 	memset(&line_rule,0,sizeof(line_rule));
+    memset(&table_line,0,sizeof(table_line));
     line_rule.label_id=0;
     line_rule.rule_id=candidate_item->config_id;
     line_rule.table_name=IR_CANDIDATE_IP_TABLE_NAME;
@@ -298,13 +299,14 @@ void Maat_set_nominee_cmd_line(Maat_feather_t feather, struct mrl_nominee_item *
 {
     const struct Maat_line_t *p_line;
 	struct Maat_line_t line_rule;
-	char table_line[128];
-	int ret=0,i=0;
+	char table_line[512];
+	int ret=0;
 	memset(&line_rule,0,sizeof(line_rule));
+    memset(&table_line,0,sizeof(table_line));
     line_rule.label_id=0;
     line_rule.rule_id=nominee_item->config_id;
     line_rule.table_name=IR_NOMINEE_IP_TABLE_NAME;
-    snprintf(table_line,sizeof(table_line[i]),"%d\t%d\t%d\t%s\t%d\t%s",
+    snprintf(table_line,sizeof(table_line),"%d\t%d\t%d\t%s\t%d\t%s",
         nominee_item->config_id, nominee_item->group_id,nominee_item->addr_type, 
         nominee_item->ip_addr,nominee_item->is_vaild, nominee_item->op_time);
     line_rule.table_line=table_line;
