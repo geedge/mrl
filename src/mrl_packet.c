@@ -8,7 +8,7 @@
 
 #include "mrl_packet.h"
 #include "mrl_main.h"
-#include "mrl_base.h"
+#include "mrl_utils.h"
 
 #define MRL_MAC_LEN 6
 #define MRL_BUFF_LEN 3000
@@ -66,7 +66,26 @@ void mrl_socket_close()
 ssize_t mrl_sock_send(int fd, const char *pkt, ssize_t pkt_len, struct sockaddr_in *dest)
 {
     ssize_t send_len = 0;
-    send_len = sendto(fd, pkt,pkt_len,0,(struct sockaddr *)dest,sizeof(struct sockaddr_in));
+    while(1)
+    {
+        send_len = sendto(fd, pkt,pkt_len,0,(struct sockaddr *)dest,sizeof(struct sockaddr_in));
+        if(send_len < 0)
+        {
+            if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                continue;
+            }
+            else
+            {
+                assert(0);
+            }
+            
+        }
+        else
+        {
+            break;
+        }
+    }
     return send_len;
 }
 
@@ -75,7 +94,26 @@ ssize_t mrl_sock_recv(int fd, char *recv_buff, size_t buff_len)
     struct sockaddr_in from;
     socklen_t from_len = sizeof(from);
     ssize_t recv_len = 0;
-    recv_len = recvfrom(fd, recv_buff, buff_len, 0, (struct sockaddr *) &from, & from_len);
+    while(1)
+    {
+         recv_len = recvfrom(fd, recv_buff, buff_len, 0, (struct sockaddr *) &from, & from_len);
+         if(recv_len < 0)
+         {
+            if(errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK)
+            {
+                continue;
+            }
+            else
+            {
+                assert(0);
+            }
+            
+         }
+         else
+         {
+            break;
+         }
+    }
     return recv_len ;
 }
 
@@ -213,7 +251,7 @@ void mrl_send_to_mgw(void *raw_pkt, int thread_seq)
     ssize_t pkt_len = strlen(pkt);
     ssize_t send_len = 0;
     send_len = mrl_sock_send(mrl_instance.mrl_snd_fd[thread_seq],pkt,pkt_len,&(mrl_instance.mgw_addr));
-    assert(send_len == pkt_len);
+    if(send_len);
 }
 
 void *mrl_recv_mgw_action(void *arg)
@@ -234,6 +272,29 @@ void *mrl_recv_mgw_action(void *arg)
         mrl_send_to_gdev(thread_seq,vxlan_info,rcv_buff + vxlan_len, recv_len - vxlan_len);
     }
     return NULL;
+}
+
+
+void detect_ip_addr(const char *ip_addr)
+{
+    
+}
+
+void ht_nominee_iterate_cb(const uchar *key, uint size, void *data, void *user)
+{
+    if(data != NULL)
+    {
+        if(MESA_htable_search_cb(mrl_instance.ht_candidate, key, size, NULL,NULL, NULL) == NULL)
+        {
+            detect_ip_addr((const char *)key);
+        }
+    }
+    
+}
+void mrl_detect_init()
+{
+    MESA_htable_iterate(mrl_instance.ht_nominee, ht_nominee_iterate_cb, NULL);
+    
 }
 
 

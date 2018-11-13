@@ -2,6 +2,8 @@
 #include<stdio.h>
 
 #include "mrl_redis.h"
+#include "mrl_utils.h"
+#include "mrl_packet.h"
 
 #define MRL_IPV4_TYPE 4
 
@@ -130,40 +132,40 @@ Maat_feather_t mrl_Maat_feather_init(const char * instance_name,const char *tabl
 
 void mrl_create_candidate_item(struct mrl_candidate_item *candidate_item, struct mrl_nominee_item *nominee_item)
 {
-    candidate_item->candidate_id = (int)Maat_cmd_incrby(mrl_instance.candidate_feather,REDIS_CANDIATE_KEY_NAME, 1);;
+    candidate_item->config_id = nominee_item->config_id;
+    candidate_item->group_id = nominee_item->group_id;
     candidate_item->addr_type = MRL_IPV4_TYPE ;
-    memcpy(candidate_item->client_ip,nominee_item->src_ip,strlen(nominee_item->src_ip));
-    candidate_item->type = nominee_item->type;
+    memcpy(candidate_item->ip_addr,nominee_item->ip_addr,strlen(nominee_item->ip_addr));
      //to do how to get ip location
     candidate_item->location = 0;
-    candidate_item->group_id = nominee_item->group_id;
     memcpy(candidate_item->mrl_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
+    candidate_item->is_vaild = 1;
+    get_cur_time(candidate_item->op_time);
 }
 
 void nominee_update_cb(int table_id,const char* table_line,void* u_para)
 {
    int ret = 0;
    struct mrl_nominee_item *nominee_item = (struct mrl_nominee_item *)calloc(1, sizeof(struct mrl_nominee_item));
-   sscanf(table_line,"%d\t%d\t%d\t%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%d\t%d",
-        &(nominee_item->region_id), &(nominee_item->group_id), &(nominee_item->addr_type),
-        nominee_item->src_ip, nominee_item->mask_src_ip, nominee_item->dport,
-        nominee_item->mask_dport, &(nominee_item->protocol), &(nominee_item->direction),
-        &(nominee_item->is_vaild), &(nominee_item->action), &(nominee_item->service),
-        nominee_item->date, &(nominee_item->type), &(nominee_item->strategy_group_id));
+   sscanf(table_line,"%d\t%d\t%d\t%s\t%d\t%s",
+        &(nominee_item->config_id), &(nominee_item->group_id), &(nominee_item->addr_type),
+        nominee_item->ip_addr, &(nominee_item->is_vaild), nominee_item->op_time);
     switch(nominee_item->is_vaild)
     {
         case 0:
-           ret = MESA_htable_del(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->src_ip, sizeof(nominee_item->src_ip), NULL);
+           ret = MESA_htable_del(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), NULL);
            assert(ret >= 0);
-           if(MESA_htable_search_cb(mrl_instance.ht_candidate, (const unsigned char *)&(nominee_item->src_ip), sizeof(nominee_item->src_ip),NULL,NULL,NULL) != NULL)
+           if(MESA_htable_search_cb(mrl_instance.ht_candidate, (const unsigned char *)&(nominee_item->ip_addr), sizeof(nominee_item->ip_addr),NULL,NULL,NULL) != NULL)
            {
-                ret = MESA_htable_del(mrl_instance.ht_candidate, (const unsigned char *)nominee_item->src_ip, sizeof(nominee_item->src_ip), NULL);
+                ret = MESA_htable_del(mrl_instance.ht_candidate, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), NULL);
                 assert(ret >= 0);
            }
            break;
         case 1:
-            ret = MESA_htable_add(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->src_ip, sizeof(nominee_item->src_ip), nominee_item);
+            ret = MESA_htable_add(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), nominee_item);
             assert(ret >= 0);
+            //todo active detect
+            detect_ip_addr(nominee_item->ip_addr);
             break;
         default:
             assert(0);
@@ -175,17 +177,18 @@ void nominee_update_cb(int table_id,const char* table_line,void* u_para)
 
 void candidate_update_cb(int table_id,const char* table_line,void* u_para)
 {
+    int ret = 0;
     struct mrl_candidate_item *candidate_item = (struct mrl_candidate_item *)calloc(1, sizeof(struct mrl_candidate_item));
-    sscanf(table_line,"%d\t%d\t%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%d\t%s\t%s",
-        &(candidate_item->candidate_id), &(candidate_item->addr_type), candidate_item->client_ip,
-        &(candidate_item->type), &(candidate_item->location), &(candidate_item->group_id),
-        candidate_item->mrl_ip,candidate_item->vxlan_info.vxlan_outer_local_mac,
-        candidate_item->vxlan_info.vxlan_outer_gdev_mac,candidate_item->vxlan_info.vxlan_outer_local_ip,
-        candidate_item->vxlan_info.vxlan_outer_gdev_ip,candidate_item->vxlan_info.vxlan_outer_local_port,
-        candidate_item->vxlan_info.vxlan_outer_gdev_port,&(candidate_item->vxlan_info.vxlan_encap_type),
-        &(candidate_item->vxlan_info.vxlan_link_id),&(candidate_item->vxlan_info.vxlan_link_dir),
-        candidate_item->vxlan_info.vxlan_inner_smac,candidate_item->vxlan_info.vxlan_inner_dmac);
-    int ret = MESA_htable_add(mrl_instance.ht_candidate, (const unsigned char *)(candidate_item->client_ip), sizeof(candidate_item->client_ip), candidate_item);
+    sscanf(table_line,"%d\t%d\t%d\t%s\t%d\t%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s",
+        &(candidate_item->config_id), &(candidate_item->group_id),&(candidate_item->addr_type), 
+        candidate_item->ip_addr,&(candidate_item->location),candidate_item->mrl_ip,
+        &(candidate_item->vxlan_info.vxlan_link_id),  &(candidate_item->vxlan_info.vxlan_encap_type),
+        &(candidate_item->vxlan_info.vxlan_link_dir),candidate_item->vxlan_info.vxlan_outer_local_port,
+        candidate_item->vxlan_info.vxlan_outer_gdev_port,candidate_item->vxlan_info.vxlan_outer_local_ip,
+        candidate_item->vxlan_info.vxlan_outer_gdev_ip,candidate_item->vxlan_info.vxlan_outer_local_mac,
+        candidate_item->vxlan_info.vxlan_outer_gdev_mac,candidate_item->vxlan_info.vxlan_inner_smac,
+        candidate_item->vxlan_info.vxlan_inner_dmac,&(candidate_item->is_vaild), candidate_item->op_time);
+    ret = MESA_htable_add(mrl_instance.ht_candidate, (const unsigned char *)(candidate_item->ip_addr), sizeof(candidate_item->ip_addr), candidate_item);
     assert(ret >= 0);
 }
 
@@ -243,25 +246,30 @@ void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candid
     const struct Maat_line_t *p_line;
 	struct Maat_line_t line_rule;
 	char table_line[128];
-	int ret=0,i=0;
+	int ret=0;
 	memset(&line_rule,0,sizeof(line_rule));
     line_rule.label_id=0;
-    line_rule.rule_id=(int)Maat_cmd_incrby(feather,"TEST_PLUG_SEQ", 1);
+    line_rule.rule_id=candidate_item->config_id;
     line_rule.table_name=IR_CANDIDATE_IP_TABLE_NAME;
-    snprintf(table_line,sizeof(table_line[i]),"%d\t%d\t%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%d\t%s\t%s",
-        candidate_item->candidate_id, candidate_item->addr_type, candidate_item->client_ip,
-        candidate_item->type, candidate_item->location, candidate_item->group_id,
-        candidate_item->mrl_ip,candidate_item->vxlan_info.vxlan_outer_local_mac,
-        candidate_item->vxlan_info.vxlan_outer_gdev_mac,candidate_item->vxlan_info.vxlan_outer_local_ip,
-        candidate_item->vxlan_info.vxlan_outer_gdev_ip,candidate_item->vxlan_info.vxlan_outer_local_port,
-        candidate_item->vxlan_info.vxlan_outer_gdev_port,candidate_item->vxlan_info.vxlan_encap_type,
-        candidate_item->vxlan_info.vxlan_link_id,candidate_item->vxlan_info.vxlan_link_dir,
-        candidate_item->vxlan_info.vxlan_inner_smac,candidate_item->vxlan_info.vxlan_inner_dmac);
+    snprintf(table_line,sizeof(table_line),"%d\t%d\t%d\t%s\t%d\t%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s",
+        candidate_item->config_id, candidate_item->group_id,candidate_item->addr_type, 
+        candidate_item->ip_addr,candidate_item->location, candidate_item->mrl_ip,
+        candidate_item->vxlan_info.vxlan_link_id,candidate_item->vxlan_info.vxlan_encap_type,
+        candidate_item->vxlan_info.vxlan_link_dir,candidate_item->vxlan_info.vxlan_outer_local_port,
+        candidate_item->vxlan_info.vxlan_outer_gdev_port,candidate_item->vxlan_info.vxlan_outer_local_ip,
+        candidate_item->vxlan_info.vxlan_outer_gdev_ip,candidate_item->vxlan_info.vxlan_outer_local_mac,
+        candidate_item->vxlan_info.vxlan_outer_gdev_mac,candidate_item->vxlan_info.vxlan_inner_smac,
+        candidate_item->vxlan_info.vxlan_inner_dmac,candidate_item->is_vaild, candidate_item->op_time);
     line_rule.table_line=table_line;
     line_rule.expire_after=0;
     p_line = &line_rule;
     ret=Maat_cmd_set_lines(feather, &p_line, 1, MAAT_OP_ADD);
-    assert(ret>0);
+    if(ret < 0)
+    {
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"Maat_set_cmd_line","Maat_cmd_set_lines func error! ret is %d",ret);
+        assert(ret>0);
+    }
+    
     return;
 }
 
@@ -276,11 +284,34 @@ void mrl_identify_nominee(struct streaminfo *mystream)
     {
         mrl_get_candidate_vxlan_info(mystream,&(candidate_item.vxlan_info));
         MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_identify_nominee","get candidate item:"
-        "candidate_id:%d,addr_type:%d,client_ip:%s,type:%d, location:%d,group_id:%d,mrl_ip:%s", 
-                      candidate_item.candidate_id, candidate_item.addr_type, candidate_item.client_ip, 
-                      candidate_item.type,candidate_item.location, candidate_item.group_id, candidate_item.mrl_ip);              
+        "config_id:%d,group_id:%d,addr_type:%d,ip_addr:%s,location:%d,mrl_ip:%s,is_vaild:%d,op_time:%s", 
+                      candidate_item.config_id, candidate_item.group_id,candidate_item.addr_type, candidate_item.ip_addr, 
+                      candidate_item.location, candidate_item.mrl_ip,candidate_item.is_vaild,candidate_item.op_time);              
         Maat_set_cmd_line(mrl_instance.candidate_feather,&candidate_item);
     }
 }
 
+
+
+
+void Maat_set_nominee_cmd_line(Maat_feather_t feather, struct mrl_nominee_item *nominee_item)
+{
+    const struct Maat_line_t *p_line;
+	struct Maat_line_t line_rule;
+	char table_line[128];
+	int ret=0,i=0;
+	memset(&line_rule,0,sizeof(line_rule));
+    line_rule.label_id=0;
+    line_rule.rule_id=nominee_item->config_id;
+    line_rule.table_name=IR_NOMINEE_IP_TABLE_NAME;
+    snprintf(table_line,sizeof(table_line[i]),"%d\t%d\t%d\t%s\t%d\t%s",
+        nominee_item->config_id, nominee_item->group_id,nominee_item->addr_type, 
+        nominee_item->ip_addr,nominee_item->is_vaild, nominee_item->op_time);
+    line_rule.table_line=table_line;
+    line_rule.expire_after=0;
+    p_line = &line_rule;
+    ret=Maat_cmd_set_lines(feather, &p_line, 1, MAAT_OP_ADD);
+    assert(ret>0);
+    return;
+}
 

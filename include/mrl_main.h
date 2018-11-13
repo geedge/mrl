@@ -15,7 +15,7 @@
 #define MRL_STR_PORT_LEN 6
 #define MRL_STR_IP_LEN 16
 
-#define DATE_LEN 50
+#define MRL_DATE_LEN 50
 
 #define MRL_MAX_PATH 50
 

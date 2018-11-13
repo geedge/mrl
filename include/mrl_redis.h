@@ -4,25 +4,16 @@
 #include "mrl_main.h"
 
 #define IR_NOMINEE_IP_TABLE_NAME "IR_NOMINEE_IP"
-#define IR_CANDIDATE_IP_TABLE_NAME  "IR_CANDINATE_IP"
-#define REDIS_CANDIATE_KEY_NAME  "IR_CANDIDATE_ID"
+#define IR_CANDIDATE_IP_TABLE_NAME  "IR_CANDIDATE_IP"
+//#define REDIS_CANDIATE_KEY_NAME  "IR_CANDIDATE_ID"
 
 struct mrl_nominee_item{
-    int region_id;
+    int config_id;
     int group_id;
     int addr_type;
-    char src_ip[MRL_STR_IP_LEN];
-    char mask_src_ip[MRL_STR_IP_LEN];
-    char dport[MRL_STR_PORT_LEN];
-    char mask_dport[MRL_STR_PORT_LEN];
-    int protocol;
-    int direction;
+    char ip_addr[MRL_STR_IP_LEN];
     int is_vaild;
-    int action;
-    int service;
-    char date[DATE_LEN];
-    int type;
-    int strategy_group_id;
+    char op_time[MRL_DATE_LEN];
 };
 
 struct mrl_vxlan_info{
@@ -39,23 +30,23 @@ struct mrl_vxlan_info{
     char vxlan_inner_dmac[MRL_STR_MAC_LEN];
 };
 struct mrl_candidate_item{
-    int candidate_id;
-    int addr_type;
-    char client_ip[MRL_STR_IP_LEN];//客户端IP
-    int type;
-    int location;
+    int config_id;
     int group_id;
+    int addr_type;
+    char ip_addr[MRL_STR_IP_LEN];//客户端IP
+    int location;
     char mrl_ip[MRL_STR_IP_LEN];
     struct mrl_vxlan_info vxlan_info;
+    int is_vaild;
+    char op_time[MRL_DATE_LEN];
 };
 
 MESA_htable_handle mrl_htable_init(void * fn_data_free_cb);
+
 void ht_candidate_free_cb(void * data);
 void ht_nominee_free_cb(void * data);
 void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candidate_item);
-
-
-
+void Maat_set_nominee_cmd_line(Maat_feather_t feather, struct mrl_nominee_item *nominee_item);
 
 Maat_feather_t mrl_Maat_feather_init(const char * instance_name,const char *table_name, Maat_start_callback_t *start,Maat_update_callback_t *update,Maat_finish_callback_t *finish,void *u_para);
 void nominee_update_cb(int table_id,const char* table_line,void* u_para);

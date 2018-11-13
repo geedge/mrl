@@ -5,7 +5,7 @@
 #include <assert.h>
 
 #include "mrl_main.h"
-#include "mrl_base.h"
+#include "mrl_utils.h"
 #include "mrl_redis.h"
 #include "mrl_packet.h"
 
@@ -53,7 +53,7 @@ void mrl_cfg_init(const char *profile)
 
     
     /**********  load maat info  **********/
-    MESA_load_profile_string_def(profile, "MAAT_INFO", "Maat_table_path", mrl_instance.mrl_cfg.Maat_table_path, MRL_MAX_PATH, "./conf/Maat_table_info.conf");    
+    MESA_load_profile_string_def(profile, "MAAT_INFO", "Maat_table_path", mrl_instance.mrl_cfg.Maat_table_path, MRL_MAX_PATH, "./conf/table_info.conf");    
     MESA_load_profile_uint_def(profile, "MAAT_INFO", "Maat_max_threads", &(mrl_instance.mrl_cfg.Maat_max_threads), 1);   
     MESA_load_profile_string_def(profile, "MAAT_INFO", "Maat_redis_ip", mrl_instance.mrl_cfg.Maat_redis_ip, MRL_STR_IP_LEN, "127.0.0.1");
     MESA_load_profile_short_def(profile, "MAAT_INFO", "Maat_redis_port", &(temp_port), 6379);
@@ -167,7 +167,6 @@ void mrl_cfg_init(const char *profile)
     free(temp_link_dir_str);
 }
 
-
 extern "C" int mrl_init(void)
 {
    
@@ -178,7 +177,6 @@ extern "C" int mrl_init(void)
     {
         assert(0);
     }
-    return 1;
 
     mrl_instance.ht_nominee = mrl_htable_init((void *)ht_nominee_free_cb);
     mrl_instance.ht_candidate = mrl_htable_init((void *)ht_candidate_free_cb);
@@ -190,7 +188,7 @@ extern "C" int mrl_init(void)
     mrl_socket_init();
     //TODO:read from nominee table and candidate table ifno and construct the packet
     //send to the speficied destination
-    
+    mrl_detect_init();
     //创建单独线程接收并处理mwg发送的数据包
     pthread_t pid;
     if(pthread_create(&pid,NULL,mrl_recv_mgw_action,NULL) <0)
@@ -199,20 +197,34 @@ extern "C" int mrl_init(void)
         assert(0); 
     }
     pthread_detach(pid); 
+    return 1;
 }
 
 int main()
 {
     mrl_init();
     int index = 0;
-    struct mrl_candidate_item candidate_item;
     char src_ip[]="192.168.11.23";
-    candidate_item.addr_type = 4 ;
-    memcpy(candidate_item.client_ip,src_ip,strlen(src_ip));
-    candidate_item.type = 0;
-         //to do how to get ip location
-    candidate_item.location = 0;
+    /*
+    struct mrl_nominee_item nominee_item;
+    memset(&nominee_item,0,sizeof(nominee_item));
+    nominee_item.config_id = 0;
+    nominee_item.group_id =1;
+    nominee_item.addr_type =4;
+    memcpy(nominee_item.ip_addr,src_ip,strlen(src_ip));
+    nominee_item.is_vaild = 1;
+    get_cur_time(nominee_item.op_time);
+    Maat_set_nominee_cmd_line(mrl_instance.nominee_feather, &nominee_item);
+*/
+    struct mrl_candidate_item candidate_item;
+    memset(&candidate_item, 0, sizeof(candidate_item));
+    candidate_item.config_id = 0;
     candidate_item.group_id = 1;
+    candidate_item.addr_type = 4 ;
+    memcpy(candidate_item.ip_addr,src_ip,strlen(src_ip));
+    candidate_item.location = 0;
+    candidate_item.is_vaild= 1;
+    get_cur_time(candidate_item.op_time);
     memcpy(candidate_item.mrl_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
     memcpy(candidate_item.vxlan_info.vxlan_inner_smac, mrl_instance.mrl_cfg.vxlan_inner_smac[index],strlen(mrl_instance.mrl_cfg.vxlan_inner_smac[index]));
     memcpy(candidate_item.vxlan_info.vxlan_inner_dmac, mrl_instance.mrl_cfg.vxlan_inner_dmac[index], strlen(mrl_instance.mrl_cfg.vxlan_inner_dmac[index]));

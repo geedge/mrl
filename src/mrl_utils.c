@@ -2,7 +2,10 @@
 #include<stdio.h>
 #include<assert.h>
 #include <ctype.h>
-#include "mrl_base.h"
+#include<time.h>
+
+#include "mrl_utils.h"
+#include "mrl_main.h"
 /* ascii×Ö·û×ª16½øÖÆ */
 char mrl_ascii_to_hex(char ascii)
 {
@@ -136,5 +139,14 @@ unsigned int mrl_split_str(char *str, const char *delim, char **dest)
         temp = strtok(NULL, delim);
     }
     return i;
+}
+
+void get_cur_time(char *date)
+{
+    time_t t;
+    struct tm *lt;
+    time(&t);
+    lt = localtime(&t);
+    snprintf(date, MRL_DATE_LEN,"%d/%d/%d %d:%d:%d",lt->tm_year+1900, lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
 }
 
