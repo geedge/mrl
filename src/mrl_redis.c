@@ -1,18 +1,16 @@
 #include <assert.h>
 #include<stdio.h>
 
-#include "mrl_redis.h"
-#include "mrl_utils.h"
 #include "mrl_packet.h"
-
-#define MRL_IPV4_TYPE 4
+#include "mrl_redis.h"
 
 extern struct mrl_global_instance mrl_instance;
+extern void mrl_detect_action(const char *ip_addr);
 
 void wrapped_Maat_set_feather_opt(Maat_feather_t feather, enum MAAT_INIT_OPT type, const void* value, int size)
 {    
     int ret = Maat_set_feather_opt(feather, type, value, size);
-    if((ret < 0))
+    if(ret < 0)
     {        
         MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"wrapped_Maat_set_feather_opt","Maat_set_feather_opt func error!");
         assert(0); 
@@ -41,6 +39,7 @@ void ht_candidate_free_cb(void * data)
 
 MESA_htable_handle mrl_htable_init(void * fn_data_free_cb)
 {
+    printf("mrl htable init\n");
 	unsigned int opt_int;
     MESA_htable_handle htable = MESA_htable_born();
     assert(htable != NULL);
@@ -123,13 +122,20 @@ int Maat_plugin_table(Maat_feather_t feather,const char* table_name,	Maat_start_
 
 Maat_feather_t mrl_Maat_feather_init(const char * instance_name,const char *table_name, Maat_start_callback_t *start,Maat_update_callback_t *update,Maat_finish_callback_t *finish,void *u_para)
 {
+    printf("mrl maat feather init\n");
     Maat_feather_t feather;
     feather = Maat_init(instance_name,mrl_instance.mrl_cfg.Maat_redis_ip,mrl_instance.mrl_cfg.Maat_redis_port,mrl_instance.mrl_cfg.Maat_stat_path);
     Maat_plugin_table(feather,table_name,start,update,finish,u_para);
     return feather;
 }
 
-
+int mrl_get_candidate_location(const char *ip_addr)
+{
+    const char *mycountry="China";
+    int location = 0;
+    location = mrl_search_ip_country(mrl_instance.mrl_mmdb, ip_addr, mycountry);
+    return location;
+}
 void mrl_create_candidate_item(struct mrl_candidate_item *candidate_item, struct mrl_nominee_item *nominee_item)
 {
     candidate_item->config_id = nominee_item->config_id;
@@ -137,8 +143,9 @@ void mrl_create_candidate_item(struct mrl_candidate_item *candidate_item, struct
     candidate_item->addr_type = MRL_IPV4_TYPE ;
     memcpy(candidate_item->ip_addr,nominee_item->ip_addr,strlen(nominee_item->ip_addr));
      //to do how to get ip location
-    candidate_item->location = 0;
-    memcpy(candidate_item->mrl_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
+    candidate_item->location = mrl_get_candidate_location(candidate_item->ip_addr);
+    assert(candidate_item->location >= 0);
+    memcpy(candidate_item->mrl_ip, mrl_instance.mrl_cfg.mrl_ip,strlen(mrl_instance.mrl_cfg.mrl_ip));
     candidate_item->is_vaild = 1;
     get_cur_time(candidate_item->op_time);
 }
@@ -146,6 +153,7 @@ void mrl_create_candidate_item(struct mrl_candidate_item *candidate_item, struct
 void nominee_update_cb(int table_id,const char* table_line,void* u_para)
 {
    int ret = 0;
+   printf("this is nominee update cb\n");
    struct mrl_nominee_item *nominee_item = (struct mrl_nominee_item *)calloc(1, sizeof(struct mrl_nominee_item));
    sscanf(table_line,"%d\t%d\t%d\t%s\t%d\t%s",
         &(nominee_item->config_id), &(nominee_item->group_id), &(nominee_item->addr_type),
@@ -155,17 +163,28 @@ void nominee_update_cb(int table_id,const char* table_line,void* u_para)
         case 0:
            ret = MESA_htable_del(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), NULL);
            assert(ret >= 0);
-           if(MESA_htable_search_cb(mrl_instance.ht_candidate, (const unsigned char *)&(nominee_item->ip_addr), sizeof(nominee_item->ip_addr),NULL,NULL,NULL) != NULL)
+           if(MESA_htable_search_cb(mrl_instance.ht_candidate, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr),NULL,NULL,NULL) != NULL)
            {
                 ret = MESA_htable_del(mrl_instance.ht_candidate, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), NULL);
                 assert(ret >= 0);
            }
            break;
         case 1:
-            ret = MESA_htable_add(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), nominee_item);
-            assert(ret >= 0);
+           if(MESA_htable_search_cb(mrl_instance.ht_candidate, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr),NULL,NULL,NULL) == NULL)
+           {
+               ret = MESA_htable_add(mrl_instance.ht_nominee, (const unsigned char *)nominee_item->ip_addr, sizeof(nominee_item->ip_addr), nominee_item);
+                if(ret < 0)
+                {
+                    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"nominee_update_cb","MESA_htable_add func error! ret is %d",ret);
+                    assert(0);
+                }
+           }
+           else
+           {
+                MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"nominee_update_cb","the nominee item is duplicated in nominee htable.");
+           }
             //todo active detect
-            detect_ip_addr(nominee_item->ip_addr);
+            mrl_detect_action(nominee_item->ip_addr);
             break;
         default:
             assert(0);
@@ -178,6 +197,7 @@ void nominee_update_cb(int table_id,const char* table_line,void* u_para)
 void candidate_update_cb(int table_id,const char* table_line,void* u_para)
 {
     int ret = 0;
+    printf("this is candidate update cb\n");
     struct mrl_candidate_item *candidate_item = (struct mrl_candidate_item *)calloc(1, sizeof(struct mrl_candidate_item));
     sscanf(table_line,"%d\t%d\t%d\t%s\t%d\t%s\t%d\t%d\t%d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\t%s",
         &(candidate_item->config_id), &(candidate_item->group_id),&(candidate_item->addr_type), 
@@ -188,8 +208,20 @@ void candidate_update_cb(int table_id,const char* table_line,void* u_para)
         candidate_item->vxlan_info.vxlan_outer_gdev_ip,candidate_item->vxlan_info.vxlan_outer_local_mac,
         candidate_item->vxlan_info.vxlan_outer_gdev_mac,candidate_item->vxlan_info.vxlan_inner_smac,
         candidate_item->vxlan_info.vxlan_inner_dmac,&(candidate_item->is_vaild), candidate_item->op_time);
-    ret = MESA_htable_add(mrl_instance.ht_candidate, (const unsigned char *)(candidate_item->ip_addr), sizeof(candidate_item->ip_addr), candidate_item);
-    assert(ret >= 0);
+    if(MESA_htable_search_cb(mrl_instance.ht_candidate, (const unsigned char *)candidate_item->ip_addr, sizeof(candidate_item->ip_addr),NULL,NULL,NULL) == NULL)
+    {
+        ret = MESA_htable_add(mrl_instance.ht_candidate, (const unsigned char *)(candidate_item->ip_addr), sizeof(candidate_item->ip_addr), candidate_item);
+        if(ret < 0)
+        {
+            MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"candidate_update_cb","MESA_htable_add func error! ret is %d",ret);
+            assert(0);
+        }
+    }
+    else
+    {
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"candidate_update_cb","the candidate item is duplicated in candidate htable.");
+    }
+    
 }
 
 long ht_search_cb(void *data, const uchar *key, uint size, void *user_arg)
@@ -205,20 +237,8 @@ long ht_search_cb(void *data, const uchar *key, uint size, void *user_arg)
 }
 
 
-void mrl_get_candidate_vxlan_info(struct streaminfo *mystream, struct mrl_vxlan_info  *vxlan)
+void mrl_get_vxlan_info(struct mrl_vxlan_info  *vxlan, unsigned int index)
 {
-    int gdev_ip = 0;
-    //get_rawpkt_opt_from_streaminfo(mystream, RAW_PKT_GET_GDEV_IP, &(gdev_ip));
-    inet_ntop(AF_INET, &gdev_ip, vxlan->vxlan_outer_gdev_ip, MRL_STR_IP_LEN);
-    unsigned int index = 0;
-    for(; index < mrl_instance.mrl_cfg.vxlan_gdev_num; index++)
-    {
-        if(memcmp(vxlan->vxlan_outer_gdev_ip,mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index],strlen(vxlan->vxlan_outer_gdev_ip)) == 0)
-        {
-            break;
-        }
-    }
-    assert(index < mrl_instance.mrl_cfg.vxlan_gdev_num);//如果等于就说明该数据包的GDEV不在主动探测的GDEV中，错误
     memcpy(vxlan->vxlan_inner_smac, mrl_instance.mrl_cfg.vxlan_inner_smac[index],strlen(mrl_instance.mrl_cfg.vxlan_inner_smac[index]));
     memcpy(vxlan->vxlan_inner_dmac, mrl_instance.mrl_cfg.vxlan_inner_dmac[index], strlen(mrl_instance.mrl_cfg.vxlan_inner_dmac[index]));
     vxlan->vxlan_encap_type = atoi(mrl_instance.mrl_cfg.vxlan_encap_type[index]);
@@ -230,9 +250,16 @@ void mrl_get_candidate_vxlan_info(struct streaminfo *mystream, struct mrl_vxlan_
     memcpy(vxlan->vxlan_outer_gdev_ip,  mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index]));
     memcpy(vxlan->vxlan_outer_local_mac, mrl_instance.mrl_cfg.vxlan_outer_local_mac,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_mac));
     memcpy(vxlan->vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[index]));
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_get_candidate_vxlan_info","get vxlan opt from rawpkt:"
-                "inner_smac:%s, inner_dmac:%s,encap_type:%d,link_id:%d, link_dir:%d,local_port:%u,"
-                "gdev_port:%u, local_ip:%s,gdev_ip:%s,local_mac:%s, gdev_mac:%s", 
+    printf("get vxlan opt from rawpkt:inner_smac:%s, inner_dmac:%s,encap_type:%d,link_id:%d, link_dir:%d,local_port:%s,"
+                "gdev_port:%s, local_ip:%s,gdev_ip:%s,local_mac:%s, gdev_mac:%s\n", 
+                vxlan->vxlan_inner_smac, vxlan->vxlan_inner_dmac, vxlan->vxlan_encap_type,
+                vxlan->vxlan_link_id, vxlan->vxlan_link_dir,vxlan->vxlan_outer_local_port,
+                vxlan->vxlan_outer_gdev_port,vxlan->vxlan_outer_local_ip,vxlan->vxlan_outer_gdev_ip,
+                vxlan->vxlan_outer_local_mac,vxlan->vxlan_outer_gdev_mac);
+    
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_get_candidate_vxlan_info", "get vxlan opt from rawpkt:"
+                "inner_smac:%s, inner_dmac:%s,encap_type:%d,link_id:%d, link_dir:%d,local_port:%s,"
+                "gdev_port:%s, local_ip:%s,gdev_ip:%s,local_mac:%s, gdev_mac:%s", 
                 vxlan->vxlan_inner_smac, vxlan->vxlan_inner_dmac, vxlan->vxlan_encap_type,
                 vxlan->vxlan_link_id, vxlan->vxlan_link_dir,vxlan->vxlan_outer_local_port,
                 vxlan->vxlan_outer_gdev_port,vxlan->vxlan_outer_local_ip,vxlan->vxlan_outer_gdev_ip,
@@ -243,6 +270,7 @@ void mrl_get_candidate_vxlan_info(struct streaminfo *mystream, struct mrl_vxlan_
 
 void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candidate_item)
 {
+    printf("start to insert candidate table\n");
     const struct Maat_line_t *p_line;
 	struct Maat_line_t line_rule;
 	char table_line[512];
@@ -268,22 +296,46 @@ void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candid
     if(ret < 0)
     {
         MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"Maat_set_cmd_line","Maat_cmd_set_lines func error! ret is %d",ret);
-        assert(ret>0);
+        assert(0);
     }
     
     return;
 }
 
+unsigned int get_gdev_ip_index(UINT32 gdev_ip)
+{
+    unsigned int index = 0;
+    char temp_ip[MRL_STR_IP_LEN];
+    memset(temp_ip,0,MRL_STR_IP_LEN);
+    inet_ntop(AF_INET, &gdev_ip, temp_ip, MRL_STR_IP_LEN);
+    for(; index < mrl_instance.mrl_cfg.vxlan_gdev_num; index++)
+    {
+        if(memcmp(temp_ip,mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index],strlen(temp_ip)) == 0)
+        {
+            break;
+        }
+    }
+    return index;
+}
 
 void mrl_identify_nominee(struct streaminfo *mystream)
 {
-    UINT32 dip;
+    char dip[MRL_STR_IP_LEN];
+    memset(dip,0,MRL_STR_IP_LEN);
+
+    uint32_t gdev_ip;
+    unsigned int index = 0;
     struct mrl_candidate_item candidate_item;
     memset(&candidate_item ,0,sizeof(struct mrl_candidate_item));
-    dip = ntohl(mystream->addr.tuple4_v4->daddr);
-    if(MESA_htable_search_cb(mrl_instance.ht_nominee, (const unsigned char *)&(dip), sizeof(dip),ht_search_cb,(void *)&candidate_item,NULL) != NULL)
+    inet_ntop(AF_INET, &(mystream->addr.tuple4_v4->daddr), dip, MRL_STR_IP_LEN);
+    if(MESA_htable_search_cb(mrl_instance.ht_nominee, (const unsigned char *)dip, MRL_STR_IP_LEN,ht_search_cb,(void *)&candidate_item,NULL) != NULL)
     {
-        mrl_get_candidate_vxlan_info(mystream,&(candidate_item.vxlan_info));
+        get_rawpkt_opt_from_streaminfo(mystream, RAW_PKT_GET_GDEV_IP, &(gdev_ip));
+        printf("cur gdev ip is %d\n",gdev_ip);
+        index = get_gdev_ip_index(gdev_ip);
+        printf("cur gdev info index is %d\n",index);
+        assert(index < mrl_instance.mrl_cfg.vxlan_gdev_num);//如果等于就说明该数据包的GDEV不在主动探测的GDEV中，错误
+        mrl_get_vxlan_info(&(candidate_item.vxlan_info),index);
         MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_identify_nominee","get candidate item:"
         "config_id:%d,group_id:%d,addr_type:%d,ip_addr:%s,location:%d,mrl_ip:%s,is_vaild:%d,op_time:%s", 
                       candidate_item.config_id, candidate_item.group_id,candidate_item.addr_type, candidate_item.ip_addr, 
@@ -292,11 +344,9 @@ void mrl_identify_nominee(struct streaminfo *mystream)
     }
 }
 
-
-
-
 void Maat_set_nominee_cmd_line(Maat_feather_t feather, struct mrl_nominee_item *nominee_item)
 {
+    printf("start to insert %s to nominee table\n",nominee_item->ip_addr);
     const struct Maat_line_t *p_line;
 	struct Maat_line_t line_rule;
 	char table_line[512];

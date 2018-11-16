@@ -5,20 +5,9 @@
 #include <assert.h>
 
 #include "mrl_main.h"
-#include "mrl_utils.h"
 #include "mrl_redis.h"
 #include "mrl_packet.h"
 
-#define MRL_MAX_STRING 50
-
-#define MRL_STR_ENCAP_TYPE_LEN 5
-#define MRL_STR_LINK_ID_LEN 5
-#define MRL_STR_LINK_DIR_LEN 2
-
-#define RLOG_LV_DEBUG       10
-#define RLOG_LV_INFO        20
-#define RLOG_LV_FATAL       30
-#define CMD_LINE_NUM    1
 
 struct mrl_global_instance mrl_instance;
 
@@ -39,7 +28,17 @@ void mrl_cfg_init(const char *profile)
     MESA_load_profile_int_def(profile, "LOG_INFO", "log_level", &(mrl_instance.mrl_cfg.mrl_log_level),RLOG_LV_DEBUG);
     MESA_load_profile_string_def(profile, "LOG_INFO", "log_path", mrl_instance.mrl_cfg.mrl_log_path, MRL_MAX_PATH, "./log/mrl.log");
 
+    /**********  load detect info  **********/
+    MESA_load_profile_string_def(profile, "DETECT_INFO", "detect_ip", mrl_instance.mrl_cfg.detect_ip, MRL_STR_IP_LEN, "0.0.0.0");
+    
+    MESA_load_profile_short_def(profile, "SOCK_INFO", "mrl_port",&(temp_port),8888);
+    assert(temp_port > 0 && temp_port <= 65535);
+    mrl_instance.mrl_cfg.detect_port = temp_port;
 
+    MESA_load_profile_short_def(profile, "SOCK_INFO", "mrl_port",&(temp_port),8888);
+    assert(temp_port > 0 && temp_port <= 65535);
+    mrl_instance.mrl_cfg.local_port = temp_port;
+    
     /**********  load sock info  **********/
     MESA_load_profile_short_def(profile, "SOCK_INFO", "mrl_port",&(temp_port),8888);
     assert(temp_port > 0 && temp_port <= 65535);
@@ -50,6 +49,7 @@ void mrl_cfg_init(const char *profile)
     mrl_instance.mrl_cfg.mgw_port = temp_port;
 
     MESA_load_profile_string_def(profile, "SOCK_INFO", "mgw_ip", mrl_instance.mrl_cfg.mgw_ip, MRL_STR_IP_LEN, "0.0.0.0");
+    MESA_load_profile_string_def(profile, "SOCK_INFO", "mrl_ip",mrl_instance.mrl_cfg.mrl_ip, MRL_STR_IP_LEN, "0.0.0.0");
 
     
     /**********  load maat info  **********/
@@ -65,7 +65,7 @@ void mrl_cfg_init(const char *profile)
     /**********  load htable info *********/
     MESA_load_profile_uint_def(profile, "HTABLE_INFO", "ht_slots", &(mrl_instance.mrl_cfg.ht_slots), 1048576);
     MESA_load_profile_uint_def(profile, "HTABLE_INFO", "ht_max_element_num", &(mrl_instance.mrl_cfg.ht_max_element_num), 0);
-    MESA_load_profile_int_def(profile, "HTABLE_INFO", "ht_mutex_num", &(mrl_instance.mrl_cfg.ht_mutex_num), 1);
+    MESA_load_profile_uint_def(profile, "HTABLE_INFO", "ht_mutex_num", &(mrl_instance.mrl_cfg.ht_mutex_num), 1);
 
     
     /**********  load gdev info  **********/
@@ -79,7 +79,6 @@ void mrl_cfg_init(const char *profile)
     temp_link_dir_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_DIR_LEN, sizeof(char));
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_gdev_mac",temp_mac_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_MAC_LEN, "00:00:00:00:00:00"); 
-    printf("temp mac string is %s\n",temp_mac_str);
     mrl_instance.mrl_cfg.vxlan_outer_gdev_mac = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
@@ -154,11 +153,11 @@ void mrl_cfg_init(const char *profile)
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_local_mac", mrl_instance.mrl_cfg.vxlan_outer_local_mac, MRL_STR_MAC_LEN, "00:00:00:00:00:00");
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_local_ip", mrl_instance.mrl_cfg.vxlan_outer_local_ip, MRL_STR_IP_LEN, "0.0.0.0");
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_local_port", mrl_instance.mrl_cfg.xvlan_outer_local_port,MRL_STR_PORT_LEN, "8888");
-
+/*
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_ip",mrl_instance.mrl_cfg.vxlan_inner_dip, MRL_STR_IP_LEN, "0.0.0.0");
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_sport", mrl_instance.mrl_cfg.vxlan_inner_sport,MRL_STR_PORT_LEN, "8888");
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_dport", mrl_instance.mrl_cfg.vxlan_inner_dport,MRL_STR_PORT_LEN, "8888");
-
+*/
     free(temp_mac_str);
     free(temp_ip_str);
     free(temp_port_str);
@@ -166,11 +165,26 @@ void mrl_cfg_init(const char *profile)
     free(temp_link_id_str);
     free(temp_link_dir_str);
 }
+void mrl_nominee_test_init()
+{
+    printf("mrl moninee_test init\n");
+    char src_ip[]="192.168.11.60";
+    const char date[]="2018/11/15/11:01:11";
+    struct mrl_nominee_item nominee_item;
+    memset(&nominee_item,0,sizeof(nominee_item));
+    nominee_item.config_id =(int)Maat_cmd_incrby(mrl_instance.nominee_feather,"TEST_PLUG_SEQ", 1);
+    nominee_item.group_id =1;
+    nominee_item.addr_type =4;
+    memcpy(nominee_item.ip_addr,src_ip,strlen(src_ip));
+    nominee_item.is_vaild = 1;
+    memcpy(nominee_item.op_time,date,strlen(date));
+    Maat_set_nominee_cmd_line(mrl_instance.nominee_feather, &nominee_item);
+}
 
 extern "C" int mrl_init(void)
 {
    
-    mrl_cfg_init("./conf/mrl.conf");
+    mrl_cfg_init("./mrl_conf/mrl.conf");
     
     mrl_instance.mrl_log_handle = MESA_create_runtime_log_handle(mrl_instance.mrl_cfg.mrl_log_path, mrl_instance.mrl_cfg.mrl_log_level);
     if(mrl_instance.mrl_log_handle == NULL)
@@ -189,6 +203,10 @@ extern "C" int mrl_init(void)
     //TODO:read from nominee table and candidate table ifno and construct the packet
     //send to the speficied destination
     mrl_detect_init();
+
+    mrl_mmdb_init("./mrl_conf/all_ip_only_coun_v4.mmdb");
+    
+    mrl_nominee_test_init();
     //创建单独线程接收并处理mwg发送的数据包
     pthread_t pid;
     if(pthread_create(&pid,NULL,mrl_recv_mgw_action,NULL) <0)
@@ -200,53 +218,37 @@ extern "C" int mrl_init(void)
     return 1;
 }
 
-int main()
+void mrl_destroy_cfg()
 {
-    mrl_init();
-    int index = 0;
-    char src_ip[]="192.168.11.23";
-    /*
-    struct mrl_nominee_item nominee_item;
-    memset(&nominee_item,0,sizeof(nominee_item));
-    nominee_item.config_id = 0;
-    nominee_item.group_id =1;
-    nominee_item.addr_type =4;
-    memcpy(nominee_item.ip_addr,src_ip,strlen(src_ip));
-    nominee_item.is_vaild = 1;
-    get_cur_time(nominee_item.op_time);
-    Maat_set_nominee_cmd_line(mrl_instance.nominee_feather, &nominee_item);
-*/
-    struct mrl_candidate_item candidate_item;
-    memset(&candidate_item, 0, sizeof(candidate_item));
-    candidate_item.config_id = 0;
-    candidate_item.group_id = 1;
-    candidate_item.addr_type = 4 ;
-    memcpy(candidate_item.ip_addr,src_ip,strlen(src_ip));
-    candidate_item.location = 0;
-    candidate_item.is_vaild= 1;
-    get_cur_time(candidate_item.op_time);
-    memcpy(candidate_item.mrl_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
-    memcpy(candidate_item.vxlan_info.vxlan_inner_smac, mrl_instance.mrl_cfg.vxlan_inner_smac[index],strlen(mrl_instance.mrl_cfg.vxlan_inner_smac[index]));
-    memcpy(candidate_item.vxlan_info.vxlan_inner_dmac, mrl_instance.mrl_cfg.vxlan_inner_dmac[index], strlen(mrl_instance.mrl_cfg.vxlan_inner_dmac[index]));
-    candidate_item.vxlan_info.vxlan_encap_type = atoi(mrl_instance.mrl_cfg.vxlan_encap_type[index]);
-    candidate_item.vxlan_info.vxlan_link_id = atoi(mrl_instance.mrl_cfg.vxlan_link_id[index]);
-    candidate_item.vxlan_info.vxlan_link_dir = atoi(mrl_instance.mrl_cfg.vxlan_link_dir[index]);
-    memcpy(candidate_item.vxlan_info.vxlan_outer_local_port, mrl_instance.mrl_cfg.xvlan_outer_local_port,strlen(mrl_instance.mrl_cfg.xvlan_outer_local_port));
-    memcpy(candidate_item.vxlan_info.vxlan_outer_gdev_port , mrl_instance.mrl_cfg.vxlan_outer_gdev_port[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[index]));
-    memcpy(candidate_item.vxlan_info.vxlan_outer_local_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
-    memcpy(candidate_item.vxlan_info.vxlan_outer_gdev_ip,  mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[index]));
-    memcpy(candidate_item.vxlan_info.vxlan_outer_local_mac, mrl_instance.mrl_cfg.vxlan_outer_local_mac,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_mac));
-    memcpy(candidate_item.vxlan_info.vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[index]));
-    Maat_set_cmd_line(mrl_instance.candidate_feather, &candidate_item);
-    return 1;
+    unsigned int i=0;
+    for(i = 0; i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
+    {
+        free(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[i]);
+        free(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[i]);
+        free(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[i]);
+        free(mrl_instance.mrl_cfg.vxlan_encap_type[i]);
+        free(mrl_instance.mrl_cfg.vxlan_link_id[i]);
+        free(mrl_instance.mrl_cfg.vxlan_link_dir[i]);
+        free(mrl_instance.mrl_cfg.vxlan_inner_smac[i]);
+        free(mrl_instance.mrl_cfg.vxlan_inner_dmac[i]);
+    }
+    free(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac);
+    free(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip);
+    free(mrl_instance.mrl_cfg.vxlan_outer_gdev_port);
+    free(mrl_instance.mrl_cfg.vxlan_encap_type);
+    free(mrl_instance.mrl_cfg.vxlan_link_id);
+    free(mrl_instance.mrl_cfg.vxlan_link_dir);
+    free(mrl_instance.mrl_cfg.vxlan_inner_smac);
+    free(mrl_instance.mrl_cfg.vxlan_inner_dmac);
 }
 
-/*
+
 extern "C" void mrl_destroy(void)
 {
-    MESA_destroy_runtime_log_handle(instance.logger);
-    Maat_burn_feather(instance.maat_father);
-    free(mrl_instance.mrl_cfg);
+    MESA_destroy_runtime_log_handle(mrl_instance.mrl_log_handle);
+    Maat_burn_feather(mrl_instance.candidate_feather);
+    Maat_burn_feather(mrl_instance.nominee_feather);
+    mrl_destroy_cfg();
     mrl_socket_close();
 }
 
@@ -288,7 +290,6 @@ extern "C" char mrl_tcpall_entry(struct streaminfo *a_tcp,void **pme, int thread
 extern "C"  char mrl_udp_entry(struct streaminfo *a_udp, void **pme, int thread_seq, void *raw_packet)
 {
 	char ret = APP_STATE_GIVEME;
-    struct mrl_nominee_item *nominee_item = NULL;
 	switch(a_udp->pktstate){
 		case OP_STATE_PENDING:	
             if(mrl_pkt_signature_identify(a_udp))
@@ -318,5 +319,4 @@ extern "C"  char mrl_udp_entry(struct streaminfo *a_udp, void **pme, int thread_
 	}
 	return ret;
 }
-*/
 

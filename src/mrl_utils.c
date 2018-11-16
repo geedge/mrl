@@ -1,11 +1,14 @@
 #include<string.h>
 #include<stdio.h>
 #include<assert.h>
-#include <ctype.h>
+#include<ctype.h>
 #include<time.h>
+#include<errno.h>
 
 #include "mrl_utils.h"
 #include "mrl_main.h"
+extern struct mrl_global_instance mrl_instance;
+
 /* ascii字符转16进制 */
 char mrl_ascii_to_hex(char ascii)
 {
@@ -59,7 +62,7 @@ char mrl_ascii_to_hex(char ascii)
 	0: 正常
 	-1:错误
 */
-int mrl_mac_pton(const char *str, int delim, char *mac)
+int mrl_mac_pton(const char *str, int delim, uint8_t *mac)
 {
 #define MAC_STR_LEN_DELIM		(17) /* length of "11:22:33:44:55:66" */
 #define MAC_STR_LEN_NODELIM		(12) /* length of "112233445566" */
@@ -71,7 +74,7 @@ int mrl_mac_pton(const char *str, int delim, char *mac)
 	{
 		if(strlen(str) != MAC_STR_LEN_DELIM) 
 		{
-			printf("MAC string length error!\n");
+			MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mac_pton","MAC string length error!");
             assert(0);
 			return -1;
 		}
@@ -80,7 +83,7 @@ int mrl_mac_pton(const char *str, int delim, char *mac)
 	{
 		if(strlen(str) != MAC_STR_LEN_NODELIM) 
 		{
-			printf("MAC string length error!\n");
+			MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mac_pton","MAC string length error!");
             assert(0);
             return -1;
 		}
@@ -92,7 +95,7 @@ int mrl_mac_pton(const char *str, int delim, char *mac)
 		mac[i] = 0; /* 先清零，赋值语句都是或操作 */
 		if(isxdigit(*s)==0)
 		{
-			printf("MAC string type error!\n");
+			MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mac_pton","MAC string type error!");
             assert(0);
             return -1;
 		}
@@ -101,7 +104,7 @@ int mrl_mac_pton(const char *str, int delim, char *mac)
 		
 		if(isxdigit(*s)==0)
 		{
-			printf("MAC string type error!\n");
+			MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mac_pton","MAC string type error!");
             assert(0);
             return -1;
 		}
@@ -110,7 +113,7 @@ int mrl_mac_pton(const char *str, int delim, char *mac)
 		
 		if((delim != -1) && i<5 && (*s++ != (char)delim))
 		{
-			printf("MAC string type error!\n");
+		    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mac_pton","MAC string type error!");
             assert(0);
 			return -1;
 		}
@@ -147,6 +150,80 @@ void get_cur_time(char *date)
     struct tm *lt;
     time(&t);
     lt = localtime(&t);
-    snprintf(date, MRL_DATE_LEN,"%d/%d/%d %d:%d:%d",lt->tm_year+1900, lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+    snprintf(date, MRL_DATE_LEN,"%d/%d/%d/%d:%d:%d",lt->tm_year+1900, lt->tm_mon, lt->tm_mday, lt->tm_hour, lt->tm_min, lt->tm_sec);
+}
+
+unsigned short mrl_get_checksum(unsigned short * buffer, size_t len)
+{
+    unsigned int sum = 0;
+ 
+    while (len > 1) {
+        sum += *buffer++;
+        len -= sizeof(unsigned short);
+    }
+ 
+    if (len) {
+        sum += *(unsigned char *)buffer;
+    }
+ 
+    while (sum >> 16) {
+        sum = (sum >> 16) + (sum & 0xffff);
+    }
+ 
+    return (unsigned short)(~sum);
+}
+
+void mrl_mmdb_init(const char *path)
+{
+    printf("mrl mmdb init\n");
+    int status =MMDB_open(path,MMDB_MODE_MMAP,&(mrl_instance.mrl_mmdb));
+    if(status != MMDB_SUCCESS)
+    {
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mmdb_init","Can't open %s - %s!",path,MMDB_strerror(status));
+        if(status == MMDB_IO_ERROR)
+        {
+            MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mmdb_init","IO error: %s",strerror(errno));
+        }
+        assert(0);
+    }
+}
+
+int mrl_search_ip_country(MMDB_s mmdb, const char *ip_address, const char *mycountry)
+{
+    int gai_error, mmdb_error;      
+    MMDB_lookup_result_s result = MMDB_lookup_string(&mmdb, ip_address, &gai_error, &mmdb_error);
+    if (0 != gai_error) 
+    {       
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mmdb_search","Error from getaddrinfo for %s - %s!",ip_address,gai_strerror(gai_error));
+        assert(0); 
+           
+    }   
+    if (MMDB_SUCCESS != mmdb_error) 
+    {
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mmdb_search","Got an error from libmaxminddb: %s!",MMDB_strerror(mmdb_error));
+        assert(0);        
+    }  
+    MMDB_entry_data_s entry_data;
+    if (result.found_entry) 
+    {      
+        int status = MMDB_get_value(&result.entry, &entry_data, "COUNTRY", NULL);
+        if (MMDB_SUCCESS != status)     
+        {
+            MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_mmdb_search","Got an error looking up the entry data - %s!",MMDB_strerror(status));
+            assert(0);
+        }      
+        if (entry_data.has_data)        
+        {           
+            if(memcmp(mycountry, entry_data.utf8_string, entry_data.data_size) == 0)
+            {
+                return 0;
+            }
+            else
+            {
+                return 1;
+            }
+        }
+    }
+    return -1;
 }
 

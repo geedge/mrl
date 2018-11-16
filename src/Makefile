@@ -8,15 +8,19 @@ CXXFLAGS = -Wall -g -fPIC
 
 INCLUDES = -I ../include
 
+#INCLUDES += -I ../support/include
+
 INCLUDES += -I /opt/MESA/include 
 
 INCLUDES += -I /opt/MESA/include/MESA
 
 LIBS = -L /opt/MESA/lib
 
-LIBS += -lMESA_prof_load -lMESA_handle_logger -lpthread -lmaatframe -lMESA_htable
+#LIBS = -L ../support/lib
 
-TARGET = mrl
+LIBS += -lMESA_prof_load -lMESA_handle_logger -lpthread -lmaatframe -lMESA_htable -lmaxminddb
+
+TARGET = mrl.so
 
 OBJS = mrl_main.o mrl_utils.o mrl_packet.o mrl_redis.o
 
@@ -25,7 +29,7 @@ OBJS = mrl_main.o mrl_utils.o mrl_packet.o mrl_redis.o
 all:$(TARGET) 
 
 $(TARGET):$(OBJS)
-	$(CXX)  $(LIBS)  $^ -o $@
+	$(CXX) -shared $(CXXFLAGS) $(OBJS) $(LIBS) -o $@  
 	
 $(OBJS):%.o:%.c
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -c $< -o $@
@@ -34,4 +38,7 @@ clean:
 	rm -rf *.o
 	
 install:
-	cp $(TARGET) ../bin
+	cp $(TARGET) /home/lijie/sapp/plug/business/mrl
+	cp ../bin/conf/mrl.inf /home/lijie/sapp/plug/business/mrl
+	cp ../bin/conf/*.conf /home/lijie/sapp/mrl_conf/
+	cp ../bin/conf/all_ip_only_coun_v4.mmdb /home/lijie/sapp/mrl_conf

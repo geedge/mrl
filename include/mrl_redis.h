@@ -51,6 +51,7 @@ void Maat_set_nominee_cmd_line(Maat_feather_t feather, struct mrl_nominee_item *
 Maat_feather_t mrl_Maat_feather_init(const char * instance_name,const char *table_name, Maat_start_callback_t *start,Maat_update_callback_t *update,Maat_finish_callback_t *finish,void *u_para);
 void nominee_update_cb(int table_id,const char* table_line,void* u_para);
 void candidate_update_cb(int table_id,const char* table_line,void* u_para);
+void mrl_identify_nominee(struct streaminfo *mystream);
 
 #endif
 

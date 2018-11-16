@@ -11,13 +11,7 @@
 #include "Maat_rule.h"
 #include "Maat_command.h"
 
-#define MRL_STR_MAC_LEN 18
-#define MRL_STR_PORT_LEN 6
-#define MRL_STR_IP_LEN 16
-
-#define MRL_DATE_LEN 50
-
-#define MRL_MAX_PATH 50
+#include "mrl_utils.h"
 
 struct mrl_global_cfg
 {
@@ -25,22 +19,28 @@ struct mrl_global_cfg
     char mrl_log_path[MRL_MAX_PATH];
     int mrl_log_level;
 
+    //detect info
+    char detect_ip[MRL_STR_IP_LEN];
+    uint16_t detect_port;
+    uint16_t local_port;
+    
     //socket info
     char mgw_ip[MRL_STR_IP_LEN];
-    unsigned short mgw_port;//mgw listen udp port
-    unsigned short mrl_port;//mrl listen udp port
+    char mrl_ip[MRL_STR_IP_LEN];
+    uint16_t mgw_port;//mgw listen udp port
+    uint16_t mrl_port;//mrl listen udp port
 
     //maat info
     char Maat_table_path[MRL_MAX_PATH];
     char Maat_redis_ip[MRL_STR_IP_LEN];    
-    unsigned short Maat_redis_port;    
+    uint16_t Maat_redis_port;    
     char Maat_stat_path[MRL_MAX_PATH];
     unsigned int Maat_max_threads;
 
     //htable info
     unsigned int ht_slots;
     unsigned int ht_max_element_num;
-    int ht_mutex_num;
+    unsigned int ht_mutex_num;
     
     /*vxlan info*/
     unsigned int vxlan_gdev_num;
@@ -54,11 +54,10 @@ struct mrl_global_cfg
     char **vxlan_link_id;
     char **vxlan_link_dir;
     char **vxlan_inner_smac;
-    char **vxlan_inner_dmac;
-    
-    char vxlan_inner_dip[MRL_STR_IP_LEN];
-    char vxlan_inner_dport[MRL_STR_PORT_LEN];
-    char vxlan_inner_sport[MRL_STR_PORT_LEN];
+    char **vxlan_inner_dmac;  
+    //char vxlan_inner_dip[MRL_STR_IP_LEN];
+    //char vxlan_inner_dport[MRL_STR_PORT_LEN];
+    //char vxlan_inner_sport[MRL_STR_PORT_LEN];
 };
 
 struct mrl_global_instance
@@ -72,6 +71,8 @@ struct mrl_global_instance
     MESA_htable_handle ht_nominee;
     MESA_htable_handle ht_candidate;
 
+    MMDB_s mrl_mmdb;
+    
     int *mrl_snd_fd;
     int mrl_rcv_fd;
     struct sockaddr_in mgw_addr;

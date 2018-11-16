@@ -1,0 +1,13 @@
+[PLUGINFO]
+PLUGNAME=MRL
+SO_PATH=./plug/business/mrl/mrl.so
+INIT_FUNC=mrl_init
+DESTROY_FUNC=mrl_destroy
+
+[TCPALL]
+FUNC_FLAG=ALL
+FUNC_NAME=mrl_tcp_entry
+
+[UDP]
+FUNC_FLAG=ALL
+FUNC_NAME=mrl_udp_entry
