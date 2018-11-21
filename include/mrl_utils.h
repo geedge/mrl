@@ -8,7 +8,7 @@
 #define MRL_STR_ENCAP_TYPE_LEN 5
 #define MRL_STR_LINK_ID_LEN 5
 #define MRL_STR_LINK_DIR_LEN 2
-
+#define MRL_STR_VPN_ID_LEN 5
 
 #define MRL_DATE_LEN 50
 

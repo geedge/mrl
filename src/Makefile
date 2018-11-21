@@ -8,7 +8,7 @@ CXXFLAGS = -Wall -g -fPIC
 
 INCLUDES = -I ../include
 
-#INCLUDES += -I ../support/include
+INCLUDES += -I /opt/mrzcpd/include
 
 INCLUDES += -I /opt/MESA/include 
 

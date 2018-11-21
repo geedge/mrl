@@ -8,6 +8,7 @@
 #include "MESA_prof_load.h"
 #include "MESA_handle_logger.h"
 #include "MESA_htable.h"
+#include "MESA_list_queue.h"
 #include "Maat_rule.h"
 #include "Maat_command.h"
 
@@ -20,8 +21,8 @@ struct mrl_global_cfg
     int mrl_log_level;
 
     //detect info
-    char detect_ip[MRL_STR_IP_LEN];
-    uint16_t detect_port;
+    char dest_ip[MRL_STR_IP_LEN];
+    uint16_t dest_port;
     uint16_t local_port;
     
     //socket info
@@ -41,7 +42,7 @@ struct mrl_global_cfg
     unsigned int ht_slots;
     unsigned int ht_max_element_num;
     unsigned int ht_mutex_num;
-    
+
     /*vxlan info*/
     unsigned int vxlan_gdev_num;
     char **vxlan_outer_gdev_mac;
@@ -51,13 +52,11 @@ struct mrl_global_cfg
     char **vxlan_outer_gdev_port;
     char xvlan_outer_local_port[MRL_STR_PORT_LEN];
     char **vxlan_encap_type;
+    char **vxlan_vpn_id;
     char **vxlan_link_id;
     char **vxlan_link_dir;
     char **vxlan_inner_smac;
     char **vxlan_inner_dmac;  
-    //char vxlan_inner_dip[MRL_STR_IP_LEN];
-    //char vxlan_inner_dport[MRL_STR_PORT_LEN];
-    //char vxlan_inner_sport[MRL_STR_PORT_LEN];
 };
 
 struct mrl_global_instance
@@ -69,9 +68,13 @@ struct mrl_global_instance
     Maat_feather_t candidate_feather;
 
     MESA_htable_handle ht_nominee;
-    MESA_htable_handle ht_candidate;
+    
+    //MESA_htable_handle ht_candidate;
+    MESA_lqueue_head mrl_queue;
 
     MMDB_s mrl_mmdb;
+
+    int stop_flag;
     
     int *mrl_snd_fd;
     int mrl_rcv_fd;
