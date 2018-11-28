@@ -7,10 +7,10 @@
 #include "mrl_main.h"
 #include "mrl_redis.h"
 #include "mrl_packet.h"
-
+#include "mrl_stat.h"
 
 struct mrl_global_instance mrl_instance;
-
+extern struct global_stat_t global_stat;
 void mrl_cfg_init(const char *profile)
 {
     char *temp_mac_str;
@@ -74,45 +74,71 @@ void mrl_cfg_init(const char *profile)
     MESA_load_profile_uint_def(profile, "VXLAN_INFO", "vxlan_gdev_num", &(mrl_instance.mrl_cfg.vxlan_gdev_num), 1);
 
     temp_mac_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_MAC_LEN,sizeof(char));
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_MAC_LEN;
+
     temp_ip_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_IP_LEN,sizeof(char));
+     global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_IP_LEN;
+     
     temp_port_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_PORT_LEN, sizeof(char));
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_PORT_LEN;
+     
     temp_encap_type_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_ENCAP_TYPE_LEN,sizeof(char));
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_ENCAP_TYPE_LEN;
+     
     temp_vpn_id_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_VPN_ID_LEN,sizeof(char));
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_VPN_ID_LEN;
+
     temp_link_id_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_ID_LEN,sizeof(char));
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_ID_LEN;
+
     temp_link_dir_str = (char *)calloc(mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_DIR_LEN, sizeof(char));
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_DIR_LEN;
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_gdev_mac",temp_mac_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_MAC_LEN, "00:00:00:00:00:00"); 
     mrl_instance.mrl_cfg.vxlan_outer_gdev_mac = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[i] = (char *)malloc(sizeof(char)*MRL_STR_MAC_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_MAC_LEN;
+    
     }
     split_num = mrl_split_str(temp_mac_str,",",mrl_instance.mrl_cfg.vxlan_outer_gdev_mac);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num);
     
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_gdev_ip",temp_ip_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_IP_LEN, "0.0.0.0"); 
     mrl_instance.mrl_cfg.vxlan_outer_gdev_ip = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory +=mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[i] = (char *)malloc(sizeof(char)*MRL_STR_IP_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_IP_LEN;
     }
     split_num = mrl_split_str(temp_ip_str,",",mrl_instance.mrl_cfg.vxlan_outer_gdev_ip);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_gdev_port",temp_port_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_PORT_LEN, "8888"); 
     mrl_instance.mrl_cfg.vxlan_outer_gdev_port = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory +=mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+        
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_outer_gdev_port[i] = (char *)malloc(sizeof(char)*MRL_STR_PORT_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_PORT_LEN;
     }
     split_num = mrl_split_str(temp_port_str,",",mrl_instance.mrl_cfg.vxlan_outer_gdev_port);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
    
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_encap_type",temp_encap_type_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_ENCAP_TYPE_LEN, "0000"); 
     mrl_instance.mrl_cfg.vxlan_encap_type = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory +=mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_encap_type[i] = (char *)malloc(sizeof(char)*MRL_STR_ENCAP_TYPE_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_ENCAP_TYPE_LEN;
     }
     split_num = mrl_split_str(temp_encap_type_str,",",mrl_instance.mrl_cfg.vxlan_encap_type);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
@@ -120,9 +146,12 @@ void mrl_cfg_init(const char *profile)
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_vpn_id",temp_vpn_id_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_VPN_ID_LEN, "0000"); 
     mrl_instance.mrl_cfg.vxlan_vpn_id = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory +=mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_vpn_id[i] = (char *)malloc(sizeof(char)*MRL_STR_VPN_ID_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_VPN_ID_LEN;
     } 
     split_num = mrl_split_str(temp_vpn_id_str,",",mrl_instance.mrl_cfg.vxlan_vpn_id);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
@@ -130,36 +159,48 @@ void mrl_cfg_init(const char *profile)
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_link_id",temp_link_id_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_LINK_ID_LEN, "0"); 
     mrl_instance.mrl_cfg.vxlan_link_id= (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_link_id[i] = (char *)malloc(sizeof(char)*MRL_STR_LINK_ID_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_LINK_ID_LEN;
     }
     split_num = mrl_split_str(temp_link_id_str,",",mrl_instance.mrl_cfg.vxlan_link_id);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_link_dir",temp_link_dir_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_LINK_DIR_LEN, "0"); 
     mrl_instance.mrl_cfg.vxlan_link_dir= (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_link_dir[i] = (char *)malloc(sizeof(char)*MRL_STR_LINK_DIR_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_LINK_DIR_LEN;
     }
     split_num = mrl_split_str(temp_link_dir_str,",",mrl_instance.mrl_cfg.vxlan_link_dir);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_smac",temp_mac_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_MAC_LEN, "00:00:00:00:00:00"); 
     mrl_instance.mrl_cfg.vxlan_inner_smac = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory +=mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_inner_smac[i] = (char *)malloc(sizeof(char)*MRL_STR_MAC_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_MAC_LEN;
     }
     split_num = mrl_split_str(temp_mac_str,",",mrl_instance.mrl_cfg.vxlan_inner_smac);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
 
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_dmac",temp_mac_str, mrl_instance.mrl_cfg.vxlan_gdev_num*MRL_STR_MAC_LEN, "00:00:00:00:00:00"); 
     mrl_instance.mrl_cfg.vxlan_inner_dmac = (char **)malloc(sizeof(char *)*mrl_instance.mrl_cfg.vxlan_gdev_num);
+    global_stat.malloc_memory +=mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+    
     for(i=0;i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         mrl_instance.mrl_cfg.vxlan_inner_dmac[i] = (char *)malloc(sizeof(char)*MRL_STR_MAC_LEN);
+        global_stat.malloc_memory += sizeof(char)*MRL_STR_MAC_LEN;
     }
     split_num = mrl_split_str(temp_mac_str,",",mrl_instance.mrl_cfg.vxlan_inner_dmac);
     assert(split_num == mrl_instance.mrl_cfg.vxlan_gdev_num); 
@@ -167,41 +208,37 @@ void mrl_cfg_init(const char *profile)
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_local_mac", mrl_instance.mrl_cfg.vxlan_outer_local_mac, MRL_STR_MAC_LEN, "00:00:00:00:00:00");
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_local_ip", mrl_instance.mrl_cfg.vxlan_outer_local_ip, MRL_STR_IP_LEN, "0.0.0.0");
     MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_local_port", mrl_instance.mrl_cfg.xvlan_outer_local_port,MRL_STR_PORT_LEN, "8888");
-/*
-    MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_ip",mrl_instance.mrl_cfg.vxlan_inner_dip, MRL_STR_IP_LEN, "0.0.0.0");
-    MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_sport", mrl_instance.mrl_cfg.vxlan_inner_sport,MRL_STR_PORT_LEN, "8888");
-    MESA_load_profile_string_def(profile, "VXLAN_INFO", "vxlan_inner_dport", mrl_instance.mrl_cfg.vxlan_inner_dport,MRL_STR_PORT_LEN, "8888");
-*/
+
     free(temp_mac_str);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_MAC_LEN;
+
     free(temp_ip_str);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_IP_LEN;
+
     free(temp_port_str);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_PORT_LEN;
+
     free(temp_encap_type_str);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_ENCAP_TYPE_LEN;
+
     free(temp_link_id_str);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_ID_LEN;
+
     free(temp_link_dir_str);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_DIR_LEN;
 }
-/*
-void mrl_nominee_test_init()
-{
-    printf("mrl moninee_test init\n");
-    char src_ip[]="192.168.11.60";
-    const char date[]="2018/11/15/11:01:11";
-    struct mrl_nominee_item nominee_item;
-    memset(&nominee_item,0,sizeof(nominee_item));
-    nominee_item.config_id =(int)Maat_cmd_incrby(mrl_instance.nominee_feather,"TEST_PLUG_SEQ", 1);
-    nominee_item.group_id =1;
-    nominee_item.addr_type =4;
-    memcpy(nominee_item.ip_addr,src_ip,strlen(src_ip));
-    nominee_item.is_vaild = 1;
-    memcpy(nominee_item.op_time,date,strlen(date));
-    Maat_set_nominee_cmd_line(mrl_instance.nominee_feather, &nominee_item);
-}*/
+
 void candidate_update_cb(int table_id,const char* table_line,void* u_para)
 {
 }
 
 extern "C" int mrl_init(void)
 {
+    int ret = 0;
     mrl_instance.stop_flag = 0;
+
+    mrl_stat_init();
+    
     mrl_cfg_init("./mrl_conf/mrl.conf");
     
     mrl_instance.mrl_log_handle = MESA_create_runtime_log_handle(mrl_instance.mrl_cfg.mrl_log_path, mrl_instance.mrl_cfg.mrl_log_level);
@@ -232,20 +269,30 @@ extern "C" int mrl_init(void)
     
     //mrl_nominee_test_init();
     //创建单独线程接收并处理mwg发送的数据包
-    pthread_t recv_pid, detect_pid;
-    if(pthread_create(&recv_pid,NULL,mrl_recv_mgw_action,NULL) <0)
+    pthread_t recv_pid, detect_pid, stat_pid;
+    ret = pthread_create(&recv_pid,NULL,mrl_recv_mgw_action,NULL);
+    if( ret < 0)
     {
-        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_init","pthread_create func error!");
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_init","recv pthread create error,error is %d",ret);
         assert(0); 
     }
     pthread_detach(recv_pid);
 
-    if(pthread_create(&detect_pid,NULL,mrl_detect_ip_action,NULL) <0)
+    ret = pthread_create(&detect_pid,NULL,mrl_detect_ip_action,NULL);
+    if( ret < 0)
     {
-        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_init","pthread_create func error!");
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_init","detect pthread create error,error is %d",ret);
         assert(0); 
     }
     pthread_detach(detect_pid);
+
+    ret = pthread_create(&stat_pid,NULL,mrl_stat_action,NULL);
+    if( ret < 0)
+    {
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_init","stat pthread create error,error is %d",ret);
+        assert(0); 
+    }
+    pthread_detach(stat_pid);
     return 1;
 }
 
@@ -255,28 +302,59 @@ void mrl_destroy_cfg()
     for(i = 0; i<mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
         free(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_MAC_LEN;
+        
         free(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_IP_LEN;
+        
         free(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_PORT_LEN;
+
         free(mrl_instance.mrl_cfg.vxlan_encap_type[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_ENCAP_TYPE_LEN;
+        
         free(mrl_instance.mrl_cfg.vxlan_link_id[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_LINK_ID_LEN;
+
         free(mrl_instance.mrl_cfg.vxlan_link_dir[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_LINK_DIR_LEN;
+        
         free(mrl_instance.mrl_cfg.vxlan_inner_smac[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_MAC_LEN;
+
         free(mrl_instance.mrl_cfg.vxlan_inner_dmac[i]);
+        global_stat.free_memory += sizeof(char)*MRL_STR_MAC_LEN;
     }
+    
     free(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+     
     free(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+
     free(mrl_instance.mrl_cfg.vxlan_outer_gdev_port);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+
     free(mrl_instance.mrl_cfg.vxlan_encap_type);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+
     free(mrl_instance.mrl_cfg.vxlan_link_id);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+
     free(mrl_instance.mrl_cfg.vxlan_link_dir);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+
     free(mrl_instance.mrl_cfg.vxlan_inner_smac);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
+
     free(mrl_instance.mrl_cfg.vxlan_inner_dmac);
+    global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * sizeof(char *);
 }
 
 
 extern "C" void mrl_destroy(void)
 {
-   
+    MESA_htable_destroy(mrl_instance.ht_nominee,ht_nominee_free_cb);
     MESA_lqueue_destroy(mrl_instance.mrl_queue,NULL,NULL);
     Maat_burn_feather(mrl_instance.candidate_feather);
     Maat_burn_feather(mrl_instance.nominee_feather);
@@ -288,13 +366,16 @@ extern "C" void mrl_destroy(void)
 
 extern "C" char mrl_tcpall_entry(struct streaminfo *a_tcp,void **pme, int thread_seq, void *raw_packet)
 {
+    global_stat.recv_gdev_total_pkts ++;
+    global_stat.recv_gdev_tcp_pkts ++;
 	char ret = APP_STATE_GIVEME;
 	switch(a_tcp->pktstate){
 		case OP_STATE_PENDING:
             if(mrl_pkt_signature_identify(a_tcp))
             {
-                 mrl_send_to_mgw(raw_packet, thread_seq);
-                 ret = APP_STATE_GIVEME;//不指定faw和drop会采取哪个动作？
+                global_stat.recv_ir_pkts ++;
+                mrl_send_to_mgw(raw_packet, thread_seq);
+                ret = APP_STATE_GIVEME;//不指定faw和drop会采取哪个动作？
             }
             else
             { 
@@ -304,12 +385,17 @@ extern "C" char mrl_tcpall_entry(struct streaminfo *a_tcp,void **pme, int thread
 		    break;
 
 		case OP_STATE_DATA:
+            global_stat.recv_ir_pkts ++;
 			mrl_send_to_mgw(raw_packet, thread_seq);
 			ret = APP_STATE_GIVEME; 
 		    break;
 
 		case OP_STATE_CLOSE:
-			mrl_send_to_mgw(raw_packet, thread_seq);
+            if(raw_packet != NULL)
+            {
+                global_stat.recv_ir_pkts ++;
+                mrl_send_to_mgw(raw_packet, thread_seq);
+            }
 			ret = APP_STATE_DROPME; 
 		    break;
 
@@ -323,27 +409,36 @@ extern "C" char mrl_tcpall_entry(struct streaminfo *a_tcp,void **pme, int thread
 
 extern "C"  char mrl_udp_entry(struct streaminfo *a_udp, void **pme, int thread_seq, void *raw_packet)
 {
-	char ret = APP_STATE_GIVEME;
+    global_stat.recv_gdev_total_pkts ++;
+    global_stat.recv_gdev_udp_pkts ++;
+
+    char ret = APP_STATE_GIVEME;
 	switch(a_udp->pktstate){
 		case OP_STATE_PENDING:	
             if(mrl_pkt_signature_identify(a_udp))
             {
+                global_stat.recv_ir_pkts ++;
                 mrl_send_to_mgw(raw_packet, thread_seq);
                 ret = APP_STATE_GIVEME;
             }
             else
             {
                 mrl_identify_nominee(a_udp);
-                ret =APP_STATE_DROPME;
+                ret =APP_STATE_DROPME|APP_STATE_FAWPKT;
             }
 		    break;
 		case OP_STATE_DATA:
+            global_stat.recv_ir_pkts ++;
 			mrl_send_to_mgw(raw_packet, thread_seq);
 			ret = APP_STATE_GIVEME;
 		    break;
 
 		case OP_STATE_CLOSE:
-			mrl_send_to_mgw(raw_packet, thread_seq);
+            if(raw_packet != NULL)
+            {
+                global_stat.recv_ir_pkts ++;
+                mrl_send_to_mgw(raw_packet, thread_seq);
+            }
 			ret = APP_STATE_DROPME;
 		    break;
 

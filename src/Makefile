@@ -18,11 +18,11 @@ LIBS = -L /opt/MESA/lib
 
 #LIBS = -L ../support/lib
 
-LIBS += -lMESA_prof_load -lMESA_handle_logger -lpthread -lmaatframe -lMESA_htable -lmaxminddb
+LIBS += -lMESA_prof_load -lMESA_handle_logger -lpthread -lmaatframe -lMESA_htable -lMESA_field_stat2 -lmaxminddb
 
 TARGET = mrl.so
 
-OBJS = mrl_main.o mrl_utils.o mrl_packet.o mrl_redis.o
+OBJS = mrl_main.o mrl_utils.o mrl_packet.o mrl_redis.o mrl_stat.o
 
 .PHONY: all clean install
 

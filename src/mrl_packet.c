@@ -12,7 +12,9 @@
 #include "mrl_main.h"
 #include "mrl_utils.h"
 #include "mrl_redis.h"
+#include "mrl_stat.h"
 
+extern struct global_stat_t global_stat;
 
 extern struct mrl_global_instance mrl_instance;
 extern void mrl_get_vxlan_info(struct mrl_vxlan_info  *vxlan, unsigned int index);
@@ -26,6 +28,8 @@ void mrl_socket_init()
     sapp_get_platform_opt(SPO_THREAD_COUNT,(void *) &thread_num, &len);
     printf("sapp thread num is %d\n",thread_num);
     mrl_instance.mrl_snd_fd = (int *) malloc (sizeof(int)*thread_num);
+    global_stat.malloc_memory += sizeof(int)*thread_num;
+    
     for(i = 0; i< thread_num;i++)
     {
         mrl_instance.mrl_snd_fd[i] = socket(AF_INET, SOCK_DGRAM, 0);   
@@ -56,8 +60,11 @@ void mrl_socket_close()
     printf("sapp thread num is %d\n",thread_num);
     for(i = 0; i< thread_num;i++)
     {
-      close(mrl_instance.mrl_snd_fd[i]);   
+      close(mrl_instance.mrl_snd_fd[i]);
     }
+
+    free(mrl_instance.mrl_snd_fd);
+    global_stat.free_memory += sizeof(int)*thread_num;
     
     close(mrl_instance.mrl_rcv_fd);
 }
@@ -239,7 +246,6 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 //判断是否是IP复用包
 bool mrl_pkt_signature_identify(struct streaminfo *mystream)
 {
-    //printf("start to signature identify\n");
     char temp_sip[MRL_STR_IP_LEN];
     char temp_dip[MRL_STR_IP_LEN];
     memset(temp_sip,0,MRL_STR_IP_LEN);
@@ -254,16 +260,17 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
     dip = ntohl(mystream->addr.tuple4_v4->daddr);
     inet_ntop(AF_INET,&(mystream->addr.tuple4_v4->saddr),temp_sip,MRL_STR_IP_LEN);
     inet_ntop(AF_INET,&(mystream->addr.tuple4_v4->daddr),temp_dip,MRL_STR_IP_LEN);
-    /*if(memcmp(temp_sip,"61.135.169.121",strlen(temp_sip)) == 0)
+    /*
+    if(memcmp(temp_sip,"61.135.169.121",strlen(temp_sip)) == 0)
     {
-        printf("cur sip is baidu\n");
+        printf("cur stream sip is baidu\n");
         return true;
     }
     else
     {
-        if(memcmp(temp_dip,"61.135.169.121",strlen(temp_sip)) == 0)
+        if(memcmp(temp_dip,"61.135.169.121",strlen(temp_dip)) == 0)
         {
-            printf("cur dip is baidu\n");
+            printf("cur stream dip is baidu\n");
             return true;
         }
         else
@@ -315,11 +322,12 @@ void mrl_send_to_mgw(void *raw_pkt, int thread_seq)
     const char *pkt = (const char *)raw_pkt;
     struct iphdr *ip_hdr = (struct iphdr *)pkt;
     ssize_t pkt_len = ntohs(ip_hdr->tot_len);
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_mgw","send to mgw len is %d",pkt_len);
     ssize_t send_len = 0;
     send_len = mrl_sock_send(mrl_instance.mrl_snd_fd[thread_seq],pkt,pkt_len,&(mrl_instance.mgw_addr));
+    global_stat.send_to_mgw_pkts += 1;
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_mgw","pkt len is %d and send to mgw len is %d",pkt_len,send_len);
     assert(send_len == pkt_len);
-    printf("send socket len is %ld\n",send_len);
+    
 }
 
 
@@ -338,7 +346,8 @@ void *mrl_recv_mgw_action(void *arg)
         }
         memset(rcv_buff,0,MRL_BUFF_LEN);
         recv_len = mrl_sock_recv(mrl_instance.mrl_rcv_fd,rcv_buff, MRL_BUFF_LEN);
-        printf("recv from mgw len is %ld\n",recv_len);
+        global_stat.recv_from_mgw_pkts ++;
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_recv_mgw_action","recv from mgw len is %ld",recv_len);
         struct mrl_vxlan_info *vxlan_info = (struct mrl_vxlan_info *)rcv_buff;
         MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_recv_mgw_action","recv mgw vxlan info:"
                     "link_id:%d,encap_type:%d,link_dir:%d,vpn_id:%d,local_port:%s,gdev_port:%s, local_ip:%s,gdev_ip:%s,"
@@ -348,11 +357,10 @@ void *mrl_recv_mgw_action(void *arg)
                     vxlan_info->vxlan_outer_local_ip,vxlan_info->vxlan_outer_gdev_ip,vxlan_info->vxlan_outer_local_mac,
                     vxlan_info->vxlan_outer_gdev_mac,vxlan_info->vxlan_inner_smac, vxlan_info->vxlan_inner_dmac);
         size_t vxlan_len = sizeof(struct mrl_vxlan_info);
-        
         temp_len = sizeof(thread_seq);
         sapp_get_platform_opt(SPO_INDEPENDENT_THREAD_ID, &thread_seq, &temp_len);
-        //printf("send to gdev thread seq is %d\n",thread_seq);
         mrl_send_to_gdev(thread_seq,vxlan_info,rcv_buff + vxlan_len, recv_len - vxlan_len);
+        global_stat.send_gdev_total_pkts ++;
     }
     return NULL;
 }
@@ -396,7 +404,7 @@ size_t mrl_build_udp_payload(char *payload)
 }
 void mrl_detect_action(uint32_t src_ip)
 {
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_detect_action","detect ip is %u",src_ip);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_detect_action","detect ip is %u",src_ip);
     unsigned int i = 0;
     int thread_seq = 0;
     int temp_len = 0;
@@ -417,12 +425,14 @@ void mrl_detect_action(uint32_t src_ip)
         memset(&vxlan_info,0,sizeof(vxlan_info));
         mrl_get_vxlan_info(&vxlan_info,i);
         mrl_send_to_gdev(thread_seq,&vxlan_info,ip_pkt,ip_len);
+        global_stat.send_detect_pkts ++;
+        global_stat.send_gdev_total_pkts ++;
     }
 }
 
 void *mrl_detect_ip_action(void *arg)
 {
-    sleep(10);
+    sleep(20);
     int ret = 0;
     uint32_t detect_ip = 0;
     long int ip_len = sizeof(detect_ip);
@@ -433,7 +443,6 @@ void *mrl_detect_ip_action(void *arg)
             break;
         }
         ret = MESA_lqueue_get_head(mrl_instance.mrl_queue,&detect_ip,&ip_len);
-        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_detect_ip_action","get ip from lqueue is %u",detect_ip);
         if(ret != 0)
         {
             MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_detect_ip_action","MESA_lqueue_get_head func error! ret is %d",ret);
