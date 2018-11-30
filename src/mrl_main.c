@@ -228,10 +228,6 @@ void mrl_cfg_init(const char *profile)
     global_stat.free_memory += mrl_instance.mrl_cfg.vxlan_gdev_num * MRL_STR_LINK_DIR_LEN;
 }
 
-void candidate_update_cb(int table_id,const char* table_line,void* u_para)
-{
-}
-
 extern "C" int mrl_init(void)
 {
     int ret = 0;
@@ -258,8 +254,7 @@ extern "C" int mrl_init(void)
 
     mrl_instance.ht_nominee = mrl_htable_init((void *)ht_nominee_free_cb);
 
-    mrl_instance.nominee_feather = mrl_Maat_feather_init("mrl_nominee",IR_NOMINEE_IP_TABLE_NAME,NULL,nominee_update_cb,NULL,NULL);
-    mrl_instance.candidate_feather = mrl_Maat_feather_init("mrl_candidate",IR_CANDIDATE_IP_TABLE_NAME,NULL,candidate_update_cb,NULL,NULL);
+    mrl_instance.mrl_feather = mrl_Maat_feather_init();
     
     mrl_socket_init();
     //TODO:read from nominee table and candidate table ifno and construct the packet
@@ -356,8 +351,7 @@ extern "C" void mrl_destroy(void)
 {
     MESA_htable_destroy(mrl_instance.ht_nominee,ht_nominee_free_cb);
     MESA_lqueue_destroy(mrl_instance.mrl_queue,NULL,NULL);
-    Maat_burn_feather(mrl_instance.candidate_feather);
-    Maat_burn_feather(mrl_instance.nominee_feather);
+    Maat_burn_feather(mrl_instance.mrl_feather);
     mrl_destroy_cfg();
     mrl_socket_close();
     mrl_instance.stop_flag = 1;
@@ -379,7 +373,6 @@ extern "C" char mrl_tcpall_entry(struct streaminfo *a_tcp,void **pme, int thread
             }
             else
             { 
-            
                 ret = APP_STATE_DROPME|APP_STATE_FAWPKT;//如果当前IP是推荐表中的IP，那么后续数据包不用给我，并且回流转发
             }
 		    break;
@@ -423,8 +416,14 @@ extern "C"  char mrl_udp_entry(struct streaminfo *a_udp, void **pme, int thread_
             }
             else
             {
-                mrl_identify_nominee(a_udp);
-                ret =APP_STATE_DROPME|APP_STATE_FAWPKT;
+                if(mrl_identify_nominee(a_udp))
+                {
+                     ret =APP_STATE_DROPME;
+                }
+                else
+                {
+                    ret =APP_STATE_DROPME|APP_STATE_FAWPKT;
+                }
             }
 		    break;
 		case OP_STATE_DATA:

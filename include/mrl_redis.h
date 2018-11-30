@@ -6,6 +6,12 @@
 #define IR_NOMINEE_IP_TABLE_NAME "IR_NOMINEE_IP"
 #define IR_CANDIDATE_IP_TABLE_NAME  "IR_CANDIDATE_IP"
 //#define REDIS_CANDIATE_KEY_NAME  "IR_CANDIDATE_ID"
+struct mrl_ht_nominee_key{
+uint32_t sip;
+uint32_t dip;
+uint16_t sport;
+uint16_t dport;
+};
 
 struct mrl_nominee_item{
     int config_id;
@@ -49,9 +55,9 @@ void ht_nominee_free_cb(void * data);
 void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candidate_item);
 void Maat_set_nominee_cmd_line(Maat_feather_t feather, struct mrl_nominee_item *nominee_item);
 
-Maat_feather_t mrl_Maat_feather_init(const char * instance_name,const char *table_name, Maat_start_callback_t *start,Maat_update_callback_t *update,Maat_finish_callback_t *finish,void *u_para);
+Maat_feather_t mrl_Maat_feather_init();
 void nominee_update_cb(int table_id,const char* table_line,void* u_para);
-void mrl_identify_nominee(struct streaminfo *mystream);
+bool mrl_identify_nominee(struct streaminfo *mystream);
 
 #endif
 

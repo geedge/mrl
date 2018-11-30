@@ -63,19 +63,11 @@ struct mrl_global_instance
 {
     void *mrl_log_handle;
     struct mrl_global_cfg mrl_cfg;
-
-    Maat_feather_t nominee_feather;
-    Maat_feather_t candidate_feather;
-
+    Maat_feather_t mrl_feather;
     MESA_htable_handle ht_nominee;
-    
-    //MESA_htable_handle ht_candidate;
     MESA_lqueue_head mrl_queue;
-
     MMDB_s mrl_mmdb;
-
     int stop_flag;
-    
     int *mrl_snd_fd;
     int mrl_rcv_fd;
     struct sockaddr_in mgw_addr;

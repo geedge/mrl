@@ -404,7 +404,10 @@ size_t mrl_build_udp_payload(char *payload)
 }
 void mrl_detect_action(uint32_t src_ip)
 {
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_detect_action","detect ip is %u",src_ip);
+    char temp_ip[MRL_STR_IP_LEN];
+    memset(temp_ip,0,MRL_STR_IP_LEN);
+    inet_ntop(AF_INET, &src_ip,temp_ip, MRL_STR_IP_LEN);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_detect_action","detect ip is %s",temp_ip);
     unsigned int i = 0;
     int thread_seq = 0;
     int temp_len = 0;
