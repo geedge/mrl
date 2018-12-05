@@ -17,7 +17,6 @@
 extern struct global_stat_t global_stat;
 
 extern struct mrl_global_instance mrl_instance;
-extern void mrl_get_vxlan_info(struct mrl_vxlan_info  *vxlan, unsigned int index);
 
 void mrl_socket_init()
 {
@@ -260,24 +259,6 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
     dip = ntohl(mystream->addr.tuple4_v4->daddr);
     inet_ntop(AF_INET,&(mystream->addr.tuple4_v4->saddr),temp_sip,MRL_STR_IP_LEN);
     inet_ntop(AF_INET,&(mystream->addr.tuple4_v4->daddr),temp_dip,MRL_STR_IP_LEN);
-    /*
-    if(memcmp(temp_sip,"61.135.169.121",strlen(temp_sip)) == 0)
-    {
-        printf("cur stream sip is baidu\n");
-        return true;
-    }
-    else
-    {
-        if(memcmp(temp_dip,"61.135.169.121",strlen(temp_dip)) == 0)
-        {
-            printf("cur stream dip is baidu\n");
-            return true;
-        }
-        else
-        {
-            return false;
-        }
-    }*/
     switch(mystream->type)
     {
         case STREAM_TYPE_TCP:
@@ -402,13 +383,30 @@ size_t mrl_build_udp_payload(char *payload)
     memcpy(payload,content,payload_len);
     return payload_len;
 }
+
+void mrl_construct_vxlan_info(struct mrl_vxlan_info *vxlan_info, int gdev_index, int link_id_index)
+{
+    
+    memcpy(vxlan_info->vxlan_outer_local_port, mrl_instance.mrl_cfg.xvlan_outer_local_port,strlen(mrl_instance.mrl_cfg.xvlan_outer_local_port));
+    memcpy(vxlan_info->vxlan_outer_gdev_port , mrl_instance.mrl_cfg.vxlan_outer_gdev_port[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[gdev_index]));
+    memcpy(vxlan_info->vxlan_outer_local_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
+    memcpy(vxlan_info->vxlan_outer_gdev_ip,  mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[gdev_index]));
+    memcpy(vxlan_info->vxlan_outer_local_mac, mrl_instance.mrl_cfg.vxlan_outer_local_mac,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_mac));
+    memcpy(vxlan_info->vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[gdev_index]));
+    vxlan_info->vxlan_link_id = mrl_instance.mrl_cfg.vxlan_link_id[gdev_index][link_id_index];
+    vxlan_info->vxlan_encap_type = mrl_instance.mrl_cfg.vxlan_encap_type[gdev_index][link_id_index];
+    vxlan_info->vxlan_vpn_id= mrl_instance.mrl_cfg.vxlan_vpn_id[gdev_index][link_id_index];
+    vxlan_info->vxlan_link_dir = mrl_instance.mrl_cfg.vxlan_link_dir[gdev_index][link_id_index];
+    memcpy(vxlan_info->vxlan_inner_smac, mrl_instance.mrl_cfg.vxlan_inner_smac[gdev_index][link_id_index],strlen(mrl_instance.mrl_cfg.vxlan_inner_smac[gdev_index][link_id_index]));
+    memcpy(vxlan_info->vxlan_inner_dmac, mrl_instance.mrl_cfg.vxlan_inner_dmac[gdev_index][link_id_index], strlen(mrl_instance.mrl_cfg.vxlan_inner_dmac[gdev_index][link_id_index]));
+}
 void mrl_detect_action(uint32_t src_ip)
 {
     char temp_ip[MRL_STR_IP_LEN];
     memset(temp_ip,0,MRL_STR_IP_LEN);
     inet_ntop(AF_INET, &src_ip,temp_ip, MRL_STR_IP_LEN);
     MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_detect_action","detect ip is %s",temp_ip);
-    unsigned int i = 0;
+    unsigned int i = 0, j =0;
     int thread_seq = 0;
     int temp_len = 0;
     size_t udp_payload_len = 0;
@@ -425,11 +423,14 @@ void mrl_detect_action(uint32_t src_ip)
     ip_len = mrl_build_ip_hdr(ip_pkt,src_ip,dest_ip,udp_len);
     for(i = 0; i< mrl_instance.mrl_cfg.vxlan_gdev_num;i++)
     {
-        memset(&vxlan_info,0,sizeof(vxlan_info));
-        mrl_get_vxlan_info(&vxlan_info,i);
-        mrl_send_to_gdev(thread_seq,&vxlan_info,ip_pkt,ip_len);
-        global_stat.send_detect_pkts ++;
-        global_stat.send_gdev_total_pkts ++;
+        for(j = 0; j < mrl_instance.mrl_cfg.vxlan_link_id_num; j ++)
+        {
+            memset(&vxlan_info,0,sizeof(vxlan_info));
+            mrl_construct_vxlan_info(&vxlan_info,i,j);
+            mrl_send_to_gdev(thread_seq,&vxlan_info,ip_pkt,ip_len);
+            global_stat.send_detect_pkts ++;
+            global_stat.send_gdev_total_pkts ++;
+        }
     }
 }
 

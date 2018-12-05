@@ -9,6 +9,8 @@
 #define MRL_STR_LINK_ID_LEN 5
 #define MRL_STR_LINK_DIR_LEN 2
 #define MRL_STR_VPN_ID_LEN 5
+#define MRL_STR_PROT_LEN 4
+#define MRL_STR_EFFEC_RANGE_LEN 20
 
 #define MRL_DATE_LEN 50
 

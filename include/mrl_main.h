@@ -37,6 +37,7 @@ struct mrl_global_cfg
     uint16_t Maat_redis_port;    
     char Maat_stat_path[MRL_MAX_PATH];
     unsigned int Maat_max_threads;
+    int redis_index;
 
     //htable info
     unsigned int ht_slots;
@@ -51,12 +52,14 @@ struct mrl_global_cfg
     char vxlan_outer_local_ip[MRL_STR_IP_LEN];
     char **vxlan_outer_gdev_port;
     char xvlan_outer_local_port[MRL_STR_PORT_LEN];
-    char **vxlan_encap_type;
-    char **vxlan_vpn_id;
-    char **vxlan_link_id;
-    char **vxlan_link_dir;
-    char **vxlan_inner_smac;
-    char **vxlan_inner_dmac;  
+    unsigned int vxlan_link_id_num;//单个串联设备最多的链路数
+    int **vxlan_vpn_id;
+    int **vxlan_encap_type;
+    int **vxlan_link_dir;
+    int **vxlan_link_id;
+    
+    char ***vxlan_inner_smac;
+    char ***vxlan_inner_dmac;  
 };
 
 struct mrl_global_instance
