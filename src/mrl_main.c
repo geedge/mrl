@@ -724,7 +724,7 @@ extern "C"  char mrl_udp_entry(struct streaminfo *a_udp, void **pme, int thread_
             }
             else
             {
-                if(mrl_identify_nominee(a_udp))
+                if(mrl_identify_nominee(a_udp,raw_packet))
                 {
                      ret =APP_STATE_GIVEME;
                 }

@@ -158,17 +158,24 @@ void nominee_update_cb(int table_id,const char *table_line,void *u_para)
                     assert(0);
                }
                MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"nominee_update_cb","insert the nominee key[sip:%u, dip:%u, sport:%hu, dport:%hu] into nominee htable.",nominee_key.sip,nominee_key.dip,nominee_key.sport,nominee_key.dport);
-               ret = MESA_lqueue_join_tail(mrl_instance.mrl_queue,&(nominee_key.sip),sizeof(nominee_key.sip));
-               MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"nominee_update_cb","insert queue ip is %u",nominee_key.sip);
-               if(ret != 0)
-               {
-                    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"nominee_update_cb","MESA_lqueue_join_tail func error! ret is %d",ret);
-                    assert(0);
-               }
+               //ret = MESA_lqueue_join_tail(mrl_instance.mrl_queue,&(nominee_key.sip),sizeof(nominee_key.sip));
+               //MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"nominee_update_cb","insert queue ip is %u",nominee_key.sip);
+               //if(ret != 0)
+               //{
+                 //   MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"nominee_update_cb","MESA_lqueue_join_tail func error! ret is %d",ret);
+                   // assert(0);
+               //}
            }
            else
            {
                 MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"nominee_update_cb","the nominee key[sip:%u, dip:%u, sport:%hu, dport:%hu] is duplicated in nominee htable.",nominee_key.sip,nominee_key.dip,nominee_key.sport,nominee_key.dport);
+           }
+           ret = MESA_lqueue_join_tail(mrl_instance.mrl_queue,&(nominee_key.sip),sizeof(nominee_key.sip));
+           printf("nominee ip %u insert into queue\n",nominee_key.sip);
+           if(ret != 0)
+           {
+                MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"nominee_update_cb","MESA_lqueue_join_tail func error! ret is %d",ret);
+                assert(0);
            }
            break;
         default:
@@ -179,23 +186,16 @@ void nominee_update_cb(int table_id,const char *table_line,void *u_para)
 }
 
 
-void dnat_policy_update_cb(int table_id, const char *table_line, void *u_para)
-{
-    
-}
-
 Maat_feather_t mrl_Maat_feather_init()
 {
     MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_Maat_feather_init","start init Maat feather!");
     Maat_feather_t feather;
     const char *nominee_instance = "mrl_nominee";
     const char *candidate_instance = "mrl_candidate";
-    const char *dnat_policy_instance ="mrl_dnat_policy";
     // init Maat       
     feather = Maat_feather(mrl_instance.mrl_cfg.Maat_max_threads, mrl_instance.mrl_cfg.Maat_table_path, mrl_instance.mrl_log_handle);
     wrapped_Maat_set_feather_opt(feather, MAAT_OPT_INSTANCE_NAME, nominee_instance, strlen(nominee_instance)+1);
     wrapped_Maat_set_feather_opt(feather, MAAT_OPT_INSTANCE_NAME, candidate_instance, strlen(candidate_instance)+1);
-    wrapped_Maat_set_feather_opt(feather, MAAT_OPT_INSTANCE_NAME, dnat_policy_instance, strlen(dnat_policy_instance)+1);  
     wrapped_Maat_set_feather_opt(feather, MAAT_OPT_REDIS_IP, mrl_instance.mrl_cfg.Maat_redis_ip, strlen(mrl_instance.mrl_cfg.Maat_redis_ip)+1);   
     wrapped_Maat_set_feather_opt(feather, MAAT_OPT_REDIS_PORT, &(mrl_instance.mrl_cfg.Maat_redis_port), sizeof(mrl_instance.mrl_cfg.Maat_redis_port));   
     wrapped_Maat_set_feather_opt(feather, MAAT_OPT_STAT_FILE_PATH, mrl_instance.mrl_cfg.Maat_stat_path, strlen(mrl_instance.mrl_cfg.Maat_stat_path)+1);   
@@ -210,7 +210,6 @@ Maat_feather_t mrl_Maat_feather_init()
         assert(0); 
     }
     Maat_plugin_table(feather,IR_NOMINEE_IP_TABLE_NAME,NULL,nominee_update_cb,NULL,NULL);
-    //Maat_plugin_table(feather,IR_DNAT_POLICY_TABLE_NAME,NULL,dnat_policy_update_cb,NULL,NULL);
     return feather;
 }
 
@@ -279,12 +278,17 @@ void mrl_get_vxlan_info(struct streaminfo *mystream, struct mrl_vxlan_info  *vxl
     memcpy(vxlan_info->vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[gdev_index]));
     get_rawpkt_opt_from_streaminfo(mystream, RAW_PKT_GET_VXLAN_ID, &link_id);
     vxlan_info->vxlan_link_id = ntohl(link_id);
-    printf("cur link id is %d\n",vxlan_info->vxlan_link_id);
+    printf("cur stream[sip:%u,sport:%hu,dip:%u,dport:%hu] link id is %d\n",mystream->addr.tuple4_v4->saddr,mystream->addr.tuple4_v4->source,mystream->addr.tuple4_v4->daddr,mystream->addr.tuple4_v4->dest,vxlan_info->vxlan_link_id);
     int position = mrl_get_link_id_index(gdev_index, vxlan_info->vxlan_link_id);
     if(position <0)
     {
-        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_get_vxlan_info","mrl_get_link_id_index error,link id is %d,gdev index is %d,position is %d",vxlan_info->vxlan_link_id,gdev_index,position);
-        assert(0);
+        printf("cur stream[sip:%u,sport:%hu,dip:%u,dport:%hu]\n",mystream->addr.tuple4_v4->saddr,mystream->addr.tuple4_v4->source,mystream->addr.tuple4_v4->daddr,mystream->addr.tuple4_v4->dest);
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_get_vxlan_info","cur stream[sip:%u,sport:%hu,dip:%u,dport:%hu]"
+                                "get link id error,link id is %d,gdev index is %d,position is %d",
+                                mystream->addr.tuple4_v4->saddr,mystream->addr.tuple4_v4->source,mystream->addr.tuple4_v4->daddr,mystream->addr.tuple4_v4->dest,
+                                vxlan_info->vxlan_link_id,gdev_index,position);
+        //assert(0);
+        position = 0;
     }
     
     vxlan_info->vxlan_encap_type = mrl_instance.mrl_cfg.vxlan_encap_type[gdev_index][position];
@@ -356,7 +360,8 @@ unsigned int get_gdev_ip_index(UINT32 gdev_ip)
     return index;
 }
 
-bool mrl_identify_nominee(struct streaminfo *mystream)
+bool mrl_identify_nominee(struct streaminfo *mystream,void *rawpkt)
+//bool mrl_identify_nominee(struct streaminfo *mystream)
 {
     char ip_addr[MRL_STR_IP_LEN];
     memset(ip_addr,0,MRL_STR_IP_LEN);
@@ -376,6 +381,8 @@ bool mrl_identify_nominee(struct streaminfo *mystream)
     if(MESA_htable_search_cb(mrl_instance.ht_nominee, (const unsigned char *)&nominee_key, sizeof(nominee_key),ht_search_cb,(void *)&candidate_item,&ret) != NULL)
     {
         global_stat.recv_detect_pkts ++;
+        struct iphdr *ip_hdr = (struct iphdr *)rawpkt;
+        printf("cur identify nominee pkt sip is %u,dip is %u\n",ip_hdr->saddr,ip_hdr->daddr);
         MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_identify_nominee","cur detected packet key is [sip:%u, dip:%u, sport:%hu, dport:%hu].",nominee_key.sip, nominee_key.dip, nominee_key.sport, nominee_key.dport);
         get_rawpkt_opt_from_streaminfo(mystream, RAW_PKT_GET_GDEV_IP, &(gdev_ip));
         index = get_gdev_ip_index(gdev_ip);

@@ -245,10 +245,6 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 //判断是否是IP复用包
 bool mrl_pkt_signature_identify(struct streaminfo *mystream)
 {
-    char temp_sip[MRL_STR_IP_LEN];
-    char temp_dip[MRL_STR_IP_LEN];
-    memset(temp_sip,0,MRL_STR_IP_LEN);
-    memset(temp_dip,0,MRL_STR_IP_LEN);
     uint8_t type = 0;
     uint16_t  sport = 0, dport = 0, temp_port = 0;
     uint32_t hash_sport = 0, hash_dport =0;
@@ -257,8 +253,6 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
     dport = ntohs(mystream->addr.tuple4_v4->dest);
     sip = ntohl(mystream->addr.tuple4_v4->saddr);
     dip = ntohl(mystream->addr.tuple4_v4->daddr);
-    inet_ntop(AF_INET,&(mystream->addr.tuple4_v4->saddr),temp_sip,MRL_STR_IP_LEN);
-    inet_ntop(AF_INET,&(mystream->addr.tuple4_v4->daddr),temp_dip,MRL_STR_IP_LEN);
     switch(mystream->type)
     {
         case STREAM_TYPE_TCP:
@@ -274,9 +268,9 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
     hash_dport = sport ^ sip ^ dip ^type;
     hash_dport = hash_dport & 0xff;
     temp_port = dport & 0xff;
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","sapp recv stream info:"
-                            "sport is %hu, dport is %hu, hash_dport is %hu, temp_port is %u,sip is %s,dip is %s, protocol is %d",
-                            sport,dport,hash_dport,temp_port,temp_sip,temp_dip,type);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","cur stream[sip:%u,sport:%hu, dip:%u,dport:%hu]"
+                            "hash info is:[hash_dport:%hu, dest_port:%u,protocol is %d",
+                            sip,sport,dip,dport,hash_dport,temp_port,type);
     if(hash_dport == temp_port)
     {
         return true;
@@ -286,9 +280,9 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
         hash_sport = dport ^ sip ^ dip ^type;
         hash_sport = hash_sport & 0xff;
         temp_port = sport & 0xff;
-        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","sapp recv stream info:"
-                            "sport is %hu, dport is %hu, hash_sport is %hu, temp_port is %u,sip is %s,dip is %s, protocol is %d",
-                            sport,dport,hash_sport,temp_port,temp_sip,temp_dip,type);
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","cur stream[sip:%u,sport:%hu, dip:%u,dport:%hu]"
+                            "hash info is:[hash_sport:%hu, dest_port:%u,protocol is %d",
+                            sip,sport,dip,dport,hash_dport,temp_port,type);
         if(hash_sport == temp_port)
         {
             return true;
@@ -447,6 +441,7 @@ void *mrl_detect_ip_action(void *arg)
             break;
         }
         ret = MESA_lqueue_get_head(mrl_instance.mrl_queue,&detect_ip,&ip_len);
+        printf("queue head ip is %u\n",detect_ip);
         if(ret != 0)
         {
             MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_detect_ip_action","MESA_lqueue_get_head func error! ret is %d",ret);
