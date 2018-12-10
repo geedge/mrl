@@ -11,7 +11,7 @@
 #define MRL_STR_VPN_ID_LEN 5
 #define MRL_STR_PROT_LEN 4
 #define MRL_STR_EFFEC_RANGE_LEN 20
-
+#define MRL_STR_NETCARD_LEN 20
 #define MRL_DATE_LEN 50
 
 #define MRL_MAX_PATH 50
@@ -38,6 +38,9 @@ unsigned int mrl_split_str(char *str, const char *delim, char **dest);
 int mrl_mac_pton(const char *str, int delim, uint8_t *mac);
 void get_cur_time(char *time);
 unsigned short mrl_get_checksum(unsigned short * buffer, size_t len);
+unsigned int mrl_get_ip_by_eth_name(const char *ifname);
+int mrl_inet_ntoa(uint32_t ip, char *dest);
+
 
 void mrl_mmdb_init(const char *path);
 int mrl_search_ip_country(MMDB_s mmdb, const char *ip_address, const char *mycountry);

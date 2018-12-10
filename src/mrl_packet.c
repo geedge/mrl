@@ -20,12 +20,10 @@ extern struct mrl_global_instance mrl_instance;
 
 void mrl_socket_init()
 {
-    printf("mrl socket init\n");
     int i;
     int thread_num = 0;
     int len = sizeof(thread_num);
     sapp_get_platform_opt(SPO_THREAD_COUNT,(void *) &thread_num, &len);
-    printf("sapp thread num is %d\n",thread_num);
     mrl_instance.mrl_snd_fd = (int *) malloc (sizeof(int)*thread_num);
     global_stat.malloc_memory += sizeof(int)*thread_num;
     
@@ -56,7 +54,6 @@ void mrl_socket_close()
     int thread_num = 0;
     int len = sizeof(thread_num);
     sapp_get_platform_opt(SPO_THREAD_COUNT,(void *) &thread_num, &len);
-    printf("sapp thread num is %d\n",thread_num);
     for(i = 0; i< thread_num;i++)
     {
       close(mrl_instance.mrl_snd_fd[i]);
@@ -131,10 +128,10 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
     uint8_t temp_mac[MRL_MAC_LEN];
     uint32_t temp_ip;
     uint16_t temp_port;
-    //printf("the vxlan info is: \n");
     memset(temp_mac, 0, MRL_MAC_LEN);
     mrl_mac_pton(vxlan_info->vxlan_outer_local_mac, ':', temp_mac);
-    //printf("SAPP_SEND_OPT_GDEV_SMAC is:%02x-%02x-%02x-%02x-%02x-%02x\n",temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_GDEV_SMAC: %02x-%02x-%02x-%02x-%02x-%02x",
+                            temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
     option[option_num].type = SAPP_SEND_OPT_GDEV_SMAC;
     option[option_num].length = MRL_MAC_LEN;
     memcpy(option[option_num].array_value, temp_mac, MRL_MAC_LEN);
@@ -142,14 +139,15 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 
     memset(temp_mac, 0, MRL_MAC_LEN);
     mrl_mac_pton(vxlan_info->vxlan_outer_gdev_mac, ':', temp_mac);
-    //printf("SAPP_SEND_OPT_GDEV_DMAC is:%02x-%02x-%02x-%02x-%02x-%02x\n",temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_GDEV_DMAC: %02x-%02x-%02x-%02x-%02x-%02x",
+                            temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
     option[option_num].type = SAPP_SEND_OPT_GDEV_DMAC;
     option[option_num].length = MRL_MAC_LEN;
     memcpy(option[option_num].array_value, temp_mac, MRL_MAC_LEN);
     option_num++;///////
 
     inet_pton(AF_INET, vxlan_info->vxlan_outer_local_ip, &temp_ip);
-    //printf("SAPP_SEND_OPT_GDEV_SIP is:%u\n",temp_ip);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_GDEV_SIP: %s",vxlan_info->vxlan_outer_local_ip);
     option[option_num].type = SAPP_SEND_OPT_GDEV_SIP;
     option[option_num].length = 4;
     option[option_num].int_value = temp_ip;
@@ -157,7 +155,7 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 
 
     inet_pton(AF_INET, vxlan_info->vxlan_outer_gdev_ip, &temp_ip); 
-    //printf("SAPP_SEND_OPT_GDEV_DIP is:%u\n",temp_ip);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_GDEV_DIP: %s",vxlan_info->vxlan_outer_gdev_ip);
     option[option_num].type = SAPP_SEND_OPT_GDEV_DIP;
     option[option_num].length = 4;
     option[option_num].int_value = temp_ip;
@@ -166,7 +164,7 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 
     temp_port = atoi(vxlan_info->vxlan_outer_local_port);
     assert(temp_port >0 && temp_port <= 65535);
-    //printf("SAPP_SEND_OPT_GDEV_UDP_SPORT is:%hu\n",temp_port);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_GDEV_UDP_SPORT: %hu",temp_port);
     option[option_num].type = SAPP_SEND_OPT_GDEV_UDP_SPORT;
     option[option_num].length = 2;
     option[option_num].short_value = htons(temp_port);
@@ -175,39 +173,38 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 
     temp_port = atoi(vxlan_info->vxlan_outer_gdev_port);
     assert(temp_port >0 && temp_port <= 65535);
-    //printf("SAPP_SEND_OPT_GDEV_UDP_DPORT is:%hu\n",temp_port);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_GDEV_UDP_DPORT: %hu",temp_port);
     option[option_num].type = SAPP_SEND_OPT_GDEV_UDP_DPORT;
     option[option_num].length = 2;
     option[option_num].short_value = htons(temp_port);
-    //printf("cur option gdev_udp_dport value is %hu\n",ntohs(option[option_num].short_value));
     option_num++;///////
     
     
     option[option_num].type = SAPP_SEND_OPT_VXLAN_VPN_ID;
-    //printf("SAPP_SEND_OPT_VXLAN_VPN_ID is %d\n",vxlan_info->vxlan_vpn_id);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_VXLAN_VPN_ID: %d",vxlan_info->vxlan_vpn_id);
     option[option_num].length = 4;
     option[option_num].int_value = vxlan_info->vxlan_vpn_id;
     option_num++;///////
 
-    //printf("SAPP_SEND_OPT_VXLAN_LINK_ID is:%d\n",vxlan_info->vxlan_link_id);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_VXLAN_LINK_ID: %d",vxlan_info->vxlan_link_id);
     option[option_num].type = SAPP_SEND_OPT_VXLAN_LINK_ID;
     option[option_num].length = 4;
     option[option_num].int_value = vxlan_info->vxlan_link_id;
     option_num++;///////
 
-    //printf("SAPP_SEND_OPT_VXLAN_LINK_ENCAP_TYPE is:%d\n",vxlan_info->vxlan_encap_type);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_VXLAN_LINK_ENCAP_TYPE: %d",TUNNAT_TUNNEL_TYPE_ETHER);
     option[option_num].type = SAPP_SEND_OPT_VXLAN_LINK_ENCAP_TYPE;
     option[option_num].length = 1;
     option[option_num].char_value = TUNNAT_TUNNEL_TYPE_ETHER;
     option_num++;///////
 
-    //printf("SAPP_SEND_OPT_VXLAN_LINK_DIR is:%d\n",vxlan_info->vxlan_link_dir);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_VXLAN_LINK_DIR: %d",vxlan_info->vxlan_link_dir);
     option[option_num].type = SAPP_SEND_OPT_VXLAN_LINK_DIR;
     option[option_num].length = 1;
     option[option_num].char_value = vxlan_info->vxlan_link_dir;
     option_num++;///////
 
-    //printf("SAPP_SEND_OPT_INNER_LINK_ENCAP_TYPE is:%d\n",vxlan_info->vxlan_encap_type);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_INNER_LINK_ENCAP_TYPE: %d",TUNNAT_TUNNEL_TYPE_ETHER);
     option[option_num].type = SAPP_SEND_OPT_INNER_LINK_ENCAP_TYPE;
     option[option_num].length = 1;
     option[option_num].char_value = TUNNAT_TUNNEL_TYPE_ETHER;
@@ -216,7 +213,8 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 
     memset(temp_mac, 0, MRL_MAC_LEN);
     mrl_mac_pton(vxlan_info->vxlan_inner_smac, ':', temp_mac);
-    //printf("SAPP_SEND_OPT_INNER_SMAC is:%02x-%02x-%02x-%02x-%02x-%02x\n",temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_INNER_SMAC: %02x-%02x-%02x-%02x-%02x-%02x",
+                            temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
     option[option_num].type = SAPP_SEND_OPT_INNER_SMAC;
     option[option_num].length = MRL_MAC_LEN;
     memcpy(option[option_num].array_value, temp_mac, MRL_MAC_LEN);
@@ -225,11 +223,13 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 
     memset(temp_mac, 0, MRL_MAC_LEN);
     mrl_mac_pton(vxlan_info->vxlan_inner_dmac, ':', temp_mac);
-    //printf("SAPP_SEND_OPT_INNER_DMAC is:%02x-%02x-%02x-%02x-%02x-%02x\n",temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_send_to_gdev","SAPP_SEND_OPT_INNER_DMAC: %02x-%02x-%02x-%02x-%02x-%02x",
+                            temp_mac[0],temp_mac[1],temp_mac[2],temp_mac[3],temp_mac[4],temp_mac[5]);
     option[option_num].type = SAPP_SEND_OPT_INNER_DMAC;
     option[option_num].length = MRL_MAC_LEN;
     memcpy(option[option_num].array_value, temp_mac, MRL_MAC_LEN);
     option_num++;///////
+    
     int ret = 0;
     ret = MESA_sendpacket_iplayer_options(thread_seq,  
                          payload,
@@ -238,7 +238,6 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
                          option,
                          option_num);
     assert(ret >=0);
-    //printf("send to gdev ret is %d\n",ret);
 }
 
 
@@ -246,6 +245,8 @@ void mrl_send_to_gdev(int thread_seq, struct mrl_vxlan_info * vxlan_info, const 
 bool mrl_pkt_signature_identify(struct streaminfo *mystream)
 {
     uint8_t type = 0;
+    char debug_sip[MRL_STR_IP_LEN];
+    char debug_dip[MRL_STR_IP_LEN];
     uint16_t  sport = 0, dport = 0, temp_port = 0;
     uint32_t hash_sport = 0, hash_dport =0;
     uint32_t sip = 0, dip = 0;
@@ -268,9 +269,12 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
     hash_dport = sport ^ sip ^ dip ^type;
     hash_dport = hash_dport & 0xff;
     temp_port = dport & 0xff;
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","cur stream[sip:%u,sport:%hu, dip:%u,dport:%hu]"
-                            "hash info is:[hash_dport:%hu, dest_port:%u,protocol is %d",
-                            sip,sport,dip,dport,hash_dport,temp_port,type);
+    
+    mrl_inet_ntoa(sip,debug_sip);
+    mrl_inet_ntoa(dip,debug_dip);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","cur stream[sip:%s,sport:%hu, dip:%s,dport:%hu]"
+                            "hash info is:[hash_dport:%hu, ir_port:%u,protocol is %d",
+                            debug_sip,sport,debug_dip,dport,hash_dport,temp_port,type);
     if(hash_dport == temp_port)
     {
         return true;
@@ -280,9 +284,9 @@ bool mrl_pkt_signature_identify(struct streaminfo *mystream)
         hash_sport = dport ^ sip ^ dip ^type;
         hash_sport = hash_sport & 0xff;
         temp_port = sport & 0xff;
-        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","cur stream[sip:%u,sport:%hu, dip:%u,dport:%hu]"
-                            "hash info is:[hash_sport:%hu, dest_port:%u,protocol is %d",
-                            sip,sport,dip,dport,hash_dport,temp_port,type);
+        MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_pkt_signature_identify","cur stream[sip:%s,sport:%hu, dip:%s,dport:%hu]"
+                            "hash info is:[hash_sport:%hu, ir_port:%u,protocol is %d",
+                            debug_sip,sport,debug_dip,dport,hash_dport,temp_port,type);
         if(hash_sport == temp_port)
         {
             return true;
@@ -380,26 +384,28 @@ size_t mrl_build_udp_payload(char *payload)
 
 void mrl_construct_vxlan_info(struct mrl_vxlan_info *vxlan_info, int gdev_index, int link_id_index)
 {
-    
-    memcpy(vxlan_info->vxlan_outer_local_port, mrl_instance.mrl_cfg.xvlan_outer_local_port,strlen(mrl_instance.mrl_cfg.xvlan_outer_local_port));
-    memcpy(vxlan_info->vxlan_outer_gdev_port , mrl_instance.mrl_cfg.vxlan_outer_gdev_port[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[gdev_index]));
-    memcpy(vxlan_info->vxlan_outer_local_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
-    memcpy(vxlan_info->vxlan_outer_gdev_ip,  mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[gdev_index]));
     memcpy(vxlan_info->vxlan_outer_local_mac, mrl_instance.mrl_cfg.vxlan_outer_local_mac,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_mac));
-    memcpy(vxlan_info->vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac[gdev_index]));
+    memcpy(vxlan_info->vxlan_outer_local_ip, mrl_instance.mrl_cfg.vxlan_outer_local_ip,strlen(mrl_instance.mrl_cfg.vxlan_outer_local_ip));
+    memcpy(vxlan_info->vxlan_outer_local_port, mrl_instance.mrl_cfg.xvlan_outer_local_port,strlen(mrl_instance.mrl_cfg.xvlan_outer_local_port));
+
+    memcpy(vxlan_info->vxlan_outer_gdev_mac, mrl_instance.mrl_cfg.vxlan_outer_gdev_mac,strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_mac));
+    memcpy(vxlan_info->vxlan_outer_gdev_ip,  mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_ip[gdev_index]));
+    memcpy(vxlan_info->vxlan_outer_gdev_port , mrl_instance.mrl_cfg.vxlan_outer_gdev_port[gdev_index],strlen(mrl_instance.mrl_cfg.vxlan_outer_gdev_port[gdev_index]));
+   
+    vxlan_info->vxlan_encap_type = 0;
+    vxlan_info->vxlan_vpn_id= mrl_instance.mrl_cfg.vxlan_vpn_id;
+    vxlan_info->vxlan_link_dir = mrl_instance.mrl_cfg.vxlan_link_dir;
+    
     vxlan_info->vxlan_link_id = mrl_instance.mrl_cfg.vxlan_link_id[gdev_index][link_id_index];
-    vxlan_info->vxlan_encap_type = mrl_instance.mrl_cfg.vxlan_encap_type[gdev_index][link_id_index];
-    vxlan_info->vxlan_vpn_id= mrl_instance.mrl_cfg.vxlan_vpn_id[gdev_index][link_id_index];
-    vxlan_info->vxlan_link_dir = mrl_instance.mrl_cfg.vxlan_link_dir[gdev_index][link_id_index];
     memcpy(vxlan_info->vxlan_inner_smac, mrl_instance.mrl_cfg.vxlan_inner_smac[gdev_index][link_id_index],strlen(mrl_instance.mrl_cfg.vxlan_inner_smac[gdev_index][link_id_index]));
     memcpy(vxlan_info->vxlan_inner_dmac, mrl_instance.mrl_cfg.vxlan_inner_dmac[gdev_index][link_id_index], strlen(mrl_instance.mrl_cfg.vxlan_inner_dmac[gdev_index][link_id_index]));
 }
 void mrl_detect_action(uint32_t src_ip)
 {
-    char temp_ip[MRL_STR_IP_LEN];
-    memset(temp_ip,0,MRL_STR_IP_LEN);
-    inet_ntop(AF_INET, &src_ip,temp_ip, MRL_STR_IP_LEN);
-    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_detect_action","detect ip is %s",temp_ip);
+    char debug_ip[MRL_STR_IP_LEN];
+    memset(debug_ip,0,MRL_STR_IP_LEN);
+    inet_ntop(AF_INET, &src_ip,debug_ip, MRL_STR_IP_LEN);
+    MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_DEBUG,"mrl_detect_action","detect ip is %s",debug_ip);
     unsigned int i = 0, j =0;
     int thread_seq = 0;
     int temp_len = 0;
@@ -441,7 +447,6 @@ void *mrl_detect_ip_action(void *arg)
             break;
         }
         ret = MESA_lqueue_get_head(mrl_instance.mrl_queue,&detect_ip,&ip_len);
-        printf("queue head ip is %u\n",detect_ip);
         if(ret != 0)
         {
             MESA_handle_runtime_log(mrl_instance.mrl_log_handle, RLOG_LV_FATAL,"mrl_detect_ip_action","MESA_lqueue_get_head func error! ret is %d",ret);

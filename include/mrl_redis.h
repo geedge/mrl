@@ -8,10 +8,10 @@
 #define IR_DNAT_POLICY_TABLE_NAME "IR_DNAT_POLICY"
 
 struct mrl_ht_nominee_key{
-uint32_t sip;//network order
-uint32_t dip;//network order
-uint16_t sport;//network order
-uint16_t dport;//network order
+char sip[MRL_STR_IP_LEN];
+char dip[MRL_STR_IP_LEN];
+uint16_t sport;//host order
+uint16_t dport;//host order
 };
 
 struct mrl_nominee_item{
@@ -58,8 +58,7 @@ void ht_nominee_free_cb(void * data);
 void Maat_set_cmd_line(Maat_feather_t feather, struct mrl_candidate_item *candidate_item);
 Maat_feather_t mrl_Maat_feather_init();
 void nominee_update_cb(int table_id,const char* table_line,void* u_para);
-bool mrl_identify_nominee(struct streaminfo *mystream,void *rawpkt);
-//bool mrl_identify_nominee(struct streaminfo *mystream);
+bool mrl_identify_nominee(struct streaminfo *mystream);
 
 #endif
 

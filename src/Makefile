@@ -38,7 +38,7 @@ clean:
 	rm -rf *.o
 	
 install:
-	cp $(TARGET) /home/lijie/sapp/plug/business/mrl
-	cp ../bin/conf/mrl.inf /home/lijie/sapp/plug/business/mrl
-	cp ../bin/conf/*.conf /home/lijie/sapp/mrl_conf/
-	cp ../bin/conf/all_ip_only_coun_v4.mmdb /home/lijie/sapp/mrl_conf
+	cp $(TARGET) /home/mesasoft/mrl_run/plug/business/mrl
+	cp ../bin/conf/mrl.inf /home/mesasoft/mrl_run/plug/business/mrl
+	cp ../bin/conf/*.conf /home/mesasoft/mrl_run/mrl_conf/
+	cp ../bin/conf/all_ip_only_coun_v4.mmdb /home/mesasoft/mrl_run/mrl_conf

@@ -4,10 +4,45 @@
 #include<ctype.h>
 #include<time.h>
 #include<errno.h>
+#include<net/if.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
 
 #include "mrl_utils.h"
 #include "mrl_main.h"
 extern struct mrl_global_instance mrl_instance;
+
+int mrl_inet_ntoa(uint32_t ip, char *dest)
+{
+    const char *_ip = inet_ntoa(*(struct in_addr *)&ip);
+    strncpy(dest, _ip, MRL_STR_IP_LEN);
+    return 0;
+}
+
+unsigned int mrl_get_ip_by_eth_name(const char *ifname)
+{
+    int sockfd;
+    struct ifreq ifr;
+    unsigned int ip;
+
+    sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (-1 == sockfd) {
+        goto error;
+    }
+
+    strcpy(ifr.ifr_name,ifname);
+    if (ioctl(sockfd, SIOCGIFADDR, &ifr) < 0) {
+        goto error;
+    }
+
+    ip = ((struct sockaddr_in*)&(ifr.ifr_addr))->sin_addr.s_addr;
+    close(sockfd);
+    return ip;
+
+error:
+    close(sockfd);
+    return -1;
+}
 
 /* ascii×Ö·û×ª16½øÖÆ */
 char mrl_ascii_to_hex(char ascii)
